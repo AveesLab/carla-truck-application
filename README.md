@@ -1,3 +1,93 @@
+# Carla for Truck Platooning - custom mode - path-tracking
+
+- **make ros2_ws**
+make ros2_ws
+'''
+mkdir ~/ros2_ws/src
+cd ~/ros2_ws/src
+'''
+
+bring package - path_tracking
+'''
+git clone https://github.com/AveesLab/carla-truck-application.git
+sudo mv -v ~/ros2_ws/src/carla-truck-application/. ~/ros2_ws/src/
+sudo rm -r ~/ros2_ws/src/carla-truck-application
+
+'''
+
+
+- **Build**
+do it first.
+```
+cd ros2_ws
+colcon build --symlink-install --packages-select ros2_msg
+```
+after that,repeat 4~5 times regradless fail.
+```
+colcon build --symlink-install 
+```
+if you see "don't find **ros2_msg** or **geographiclib**
+
+'''
+sudo apt install geographiclib-*
+
+sudo apt install rosdep
+
+rosdep update
+
+rosdep install --from-paths src --ignore-src -r
+
+source install/setup.bash
+'''
+
+- **Turn on Carla**
+go to carla directory and turn on carla
+```
+cd ~/carla
+make launch
+```
+set map -> **map04_opt** and push botton "play" 
+
+- **bring truck and set cam**
+'''
+cd ros2_ws
+
+ros2 launch carla-virtual-platoon carla-virtual-platoon.launch.py Map:=Town04_Opt NumTrucks:=3
+'''
+
+-----------------------------------------------------
+ if you want to set number of truck, change 'NumTrucks' parameter
+such as 
+'''
+ros2 launch carla-virtual-platoon carla-virtual-platoon.launch.py Map:=Town04_Opt NumTrucks:=2
+
+'''
+or
+'''
+ros2 launch carla-virtual-platoon carla-virtual-platoon.launch.py Map:=Town04_Opt NumTrucks:=1
+'''
+----------------------------------------------------------
+
+set cam
+'''
+cd ~/ros2_ws/src/map_python
+python3 setcam.py
+'''
+
+waypoint_visualize
+'''
+python3 waypoint_visualize.py
+'''
+
+- **control truck**
+'''
+cd ~/ros2_ws
+ros2 launch truck_controller truck_controller.launch.py num_trucks:=1
+'''
+
+
+
+
 # Carla for Truck Platooning
 ![image](https://github.com/user-attachments/assets/660c8a2d-9d09-4205-a218-db2de69b4cb5)
 
