@@ -41,19 +41,28 @@ class CarlaWaypointVisualizer(Node):
 
     def visualize_waypoints(self):
         # life_time을 크게 줘서 지워지지 않게 함
+
+            # self.world.debug.draw_string(wp1, 'O', draw_shadow=False,
+            #             color=carla.Color(r=255, g=0, b=0), life_time=LT,
+            #             persistent_lines=True)
+
         LT = 1e6
         for i in range(len(self.waypoints) - 1):
             wp1 = self.waypoints[i].location
             wp2 = self.waypoints[i + 1].location
+
+            # 1800~1850 구간만 초록색, 나머지는 빨간색
+            if 1400 <= i <= 2000:
+                color = carla.Color(0, 255, 0)  # Green
+            else:
+                color = carla.Color(255, 0, 0)  # Red
+
             self.world.debug.draw_line(
                 wp1, wp2,
                 thickness=0.1,
-                color=carla.Color(255, 0, 0),
+                color=color,
                 life_time=LT
             )
-            # self.world.debug.draw_string(wp1, 'O', draw_shadow=False,
-            #             color=carla.Color(r=255, g=0, b=0), life_time=LT,
-            #             persistent_lines=True)
 
 def main(args=None):
     rclpy.init(args=args)

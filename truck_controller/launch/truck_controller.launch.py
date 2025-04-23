@@ -20,9 +20,11 @@ def generate_controllers(context):
             arguments=[str(i), f'controller{i}'],
             parameters=[{
               'csv_path':     csv0,
-              'lookahead_dist': 3.0,
-              'max_speed':      2.5,
-              'k_angular':      1.0
+              'lookahead_dist': 10.0,
+              'max_speed':      0.3,
+              'k_angular':      1.0,
+
+ 
             }]
         ))
     return nodes

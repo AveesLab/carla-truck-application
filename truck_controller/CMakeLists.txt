@@ -8,11 +8,16 @@ find_package(std_msgs     REQUIRED)
 find_package(ros2_msg     REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
-
+find_package(sensor_msgs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 
 # 헤더 검색
 include_directories(include)
+
+include_directories(
+  ${tf2_geometry_msgs_INCLUDE_DIRS}
+)
 
 # 실행 파일
 add_executable(truck_controller_node
@@ -28,6 +33,8 @@ ament_target_dependencies(
   ros2_msg
   rclcpp std_msgs ros2_msg
   nav_msgs geometry_msgs
+  sensor_msgs  
+  tf2_geometry_msgs
 
 )
 
