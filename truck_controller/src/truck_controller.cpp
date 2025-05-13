@@ -5,31 +5,29 @@
 #include <limits>     // quiet_NaN, infinity
 #include <algorithm>  // clamp, max, min
 #include <stdexcept>
+#include <string>
 
-TruckController::TruckController()
-: Node("truck_controller_node"),
-  current_wp_idx_(18250) // 요청대로 시작 인덱스 초기화
+TruckController::TruckController(int argu_id)
+: Node("truck_controller_node_" + std::to_string(argu_id)),
+  current_wp_idx_(0), // 요청대로 시작 인덱스 초기화
+  actor_id_(argu_id)
 {
+  if(actor_id_ == 1) current_wp_idx_ = 0;
+  if(actor_id_ == 2) current_wp_idx_ = 0;
+
+
   // --- 파라미터 선언 및 값 가져오기 ---
   this->declare_parameter<std::string>("csv_path", "");
-  this->declare_parameter<double>("reference_lat", 0.0); // Waypoint 변환에 필요할 수 있음
-  this->declare_parameter<double>("reference_lon", 0.0);
-  this->declare_parameter<double>("reference_alt", 0.0);
-  this->declare_parameter<double>("lookahead_dist", 10.0); // Kappa 계산 시 사용될 기본값
-  this->declare_parameter<double>("max_speed", 5.0);      // 기본값
-  this->declare_parameter<double>("wheel_base", 3.0);    // 기본값, 확인 필요
-  // k_angular 파라미터는 현재 로직에서 사용 안 함
+  this->declare_parameter<double>("lookahead_dist"); 
+  this->declare_parameter<double>("max_speed");     
+  this->declare_parameter<double>("wheel_base");    
 
   std::string csv_path;
-  double ref_lat, ref_lon, ref_alt;
+
   this->get_parameter("csv_path", csv_path);
-  this->get_parameter("reference_lat", ref_lat);
-  this->get_parameter("reference_lon", ref_lon);
-  this->get_parameter("reference_alt", ref_alt);
   this->get_parameter("lookahead_dist", lookahead_dist_);
   this->get_parameter("max_speed", max_speed_);
   this->get_parameter("wheel_base", wheel_base_);
-  // this->get_parameter("max_steer_rad", max_steer_angle_rad); // 파라미터로 받을 경우
 
   // --- 상태 변수 초기화 ---
   prev_x_ = std::numeric_limits<double>::quiet_NaN(); // 이전 위치 없음 표시
@@ -38,16 +36,18 @@ TruckController::TruckController()
   start_y_ = std::numeric_limits<double>::quiet_NaN();
   current_yaw_ = 0.0; // 초기 Yaw는 우선 0 또는 경로 방향으로 설정 (직진 유도용)
 
-  // ENU converter 초기화 (Waypoint 로딩에 필요 시)
-  geo_converter_.Reset(ref_lat, ref_lon, ref_alt);
+
 
   // 웨이포인트 로드 (이 함수는 waypoints_ 멤버 변수를 ENU 좌표로 채운다고 가정)
-  load_waypoints(csv_path);
-  int actor_id_;
+  load_waypoints_0(csv_path);
+  load_waypoints_1(csv_path);
+  waypoints_ = _waypoints_0;
 
-    // --- 초기 Yaw 설정 (경로 18250->18251 방향): 초기 직진 방향 가이드용 ---
+
+
+    // --- 초기 Yaw 설정 (경로 0->1 방향): 초기 직진 방향 가이드용 ---
     if (waypoints_.size() >= 2) {
-      size_t start_idx = 18250; size_t next_idx = start_idx + 1;
+      size_t start_idx = 0; size_t next_idx = start_idx + 1;
       if (start_idx < waypoints_.size() && next_idx < waypoints_.size()) {
           double dx_init = waypoints_[next_idx].x - waypoints_[start_idx].x;
           double dy_init = waypoints_[next_idx].y - waypoints_[start_idx].y;
@@ -57,13 +57,17 @@ TruckController::TruckController()
           } else { /* zero length segment */ }
       } else { /* index out of bounds */ }
   } else { /* not enough waypoints */ }
-  // 만약 초기 Yaw가 0이면 그대로 0 유지
 
+    // 초기 Yaw 설정 로직은 compute_control 첫 호출 시 수행됨
+    std::string ns = "/truck" + std::to_string(actor_id_);
+  if(actor_id_ == 99) 
+  {
+    while(1)
+    {
+        RCLCPP_INFO_STREAM(this->get_logger(),"No get NameSpace(argument) Please Re-start");
+    }
+  }
 
-
-
-  // 초기 Yaw 설정 로직은 compute_control 첫 호출 시 수행됨
-  std::string ns = "/truck" + std::to_string(actor_id_);
   // ROS 통신 설정 (namespace 덕분에 /truck0/gnss 등으로 구독합니다)
 
   pub_vel_ = this->create_publisher<std_msgs::msg::Float64>(ns + "/velocity_control", 10);
@@ -209,37 +213,72 @@ void TruckController::compute_control()
              RCLCPP_WARN_ONCE(this->get_logger(), "Current yaw is NaN in RUNNING state. Skipping control.");
              return;
         }
+
+        double heading = current_yaw_;
         // --- 헤딩 추정 끝 ---
 
-
         // --- 2. Pure Pursuit 로직 (이전과 동일) ---
-        double heading = current_yaw_;
+        while(1)
+        {
+            // 가장 가까운 웨이포인트 찾기 (Window 사용)
+            // ... (nearest_idx_pp 계산 로직 -) ...
 
-        // 가장 가까운 웨이포인트 찾기 (Window 사용)
-        // ... (nearest_idx_pp 계산 로직 - 이전 답변 참고) ...
-         int window_pp = 100; int start_pp = std::max<int>(current_wp_idx_ - window_pp, 0); 
-         int end_pp = std::min<int>(current_wp_idx_ + window_pp, (int)waypoints_.size() - 1); int nearest_idx_pp = current_wp_idx_;
-         if (start_pp <= end_pp && start_pp < (int)waypoints_.size() && end_pp >= 0) 
-         { 
-          double min_d2_pp = std::numeric_limits<double>::infinity(); 
-          for (int i = start_pp; i <= end_pp; ++i)
-           { 
-            if (i < 0 || i >= (int)waypoints_.size()) continue;
-            double dx_wp = waypoints_[i].x - cur_x_;
-            double dy_wp = waypoints_[i].y - cur_y_;
-            double d2 = dx_wp * dx_wp + dy_wp * dy_wp;
-            if (d2 < min_d2_pp)
+            if(current_wp_idx_ >  (int)waypoints_.size() - 2) current_wp_idx_ = 0; //bbang bbang
+
+            //간이 거리 탐색
+            double temp_dx = waypoints_[current_wp_idx_].x - cur_x_;
+            double temp_dy = waypoints_[current_wp_idx_].y - cur_y_;
+            double temp_d2 = temp_dx * temp_dx + temp_dy * temp_dy;
+            if(sqrt(temp_d2)>200)
+            {   
+                current_wp_idx_+=100;
+
+                continue;
+            } 
+
+            int window_pp = 10;
+            int start_pp = std::max<int>(current_wp_idx_ - window_pp, 0); 
+
+            int end_pp = std::min<int>(current_wp_idx_ + window_pp, (int)waypoints_.size() - 1);
+            int nearest_idx_pp = current_wp_idx_;
+
+            if (start_pp <= end_pp && start_pp < (int)waypoints_.size() && end_pp >= 0) 
             { 
-              min_d2_pp = d2; nearest_idx_pp = i;
-            }
-           } 
-           if (nearest_idx_pp < 0 || nearest_idx_pp >= (int)waypoints_.size())
-            { 
-              nearest_idx_pp = current_wp_idx_;
-             } 
-          } 
-          if (nearest_idx_pp < 0 || nearest_idx_pp >= (int)waypoints_.size()) nearest_idx_pp = 0;
-         current_wp_idx_ = nearest_idx_pp;
+                //거리 탐색
+                double min_d2_pp = std::numeric_limits<double>::infinity(); 
+                for (int i = start_pp; i <= end_pp; ++i)
+                { 
+                    double dx_wp = waypoints_[i].x - cur_x_;
+                    double dy_wp = waypoints_[i].y - cur_y_;
+                    double d2 = dx_wp * dx_wp + dy_wp * dy_wp;
+
+                    if (d2 < min_d2_pp)
+                    { 
+                        min_d2_pp = d2; 
+                        nearest_idx_pp = i;
+                    }
+                } 
+
+                if(sqrt(min_d2_pp) > dist_threshold)
+                {
+                    current_wp_idx_+=10;
+
+                    continue;
+                }  
+                else 
+                {
+
+                    current_wp_idx_ = nearest_idx_pp;
+                    break;
+                }
+            } 
+        }
+
+        //for lane change
+        // if(current_wp_idx_ > 400 && current_wp_idx_<410)
+        // {
+        //     waypoints_=_waypoints_1;
+        // }
 
           // --- [수정됨] 목표점 찾기 (Lookahead Distance 기반 기하학적 탐색) ---
           Point2D lookahead_point = {0, 0}; // 최종 목표 지점 좌표 (x, y)
@@ -247,7 +286,7 @@ void TruckController::compute_control()
           double lookahead_dist_sq = lookahead_dist_ * lookahead_dist_; // 목표 거리 제곱 (계산 최적화)
 
           // 가장 가까운 웨이포인트 인덱스(nearest_idx_pp)부터 경로를 따라 탐색 시작
-          size_t search_idx = nearest_idx_pp;
+          size_t search_idx = current_wp_idx_;
 
           for (size_t i = 0; i < waypoints_.size(); ++i) { // 경로 전체를 최대 한 바퀴 탐색
               size_t p1_idx = search_idx;                      // 현재 탐색 선분의 시작점 인덱스
@@ -294,8 +333,8 @@ void TruckController::compute_control()
           if (!found_lookahead) { // 모든 선분을 탐색했는데도 교점을 못 찾은 경우
               RCLCPP_WARN(this->get_logger(), "Lookahead point not found via intersection, using fallback logic.");
               // 대체 로직 사용 (예: 가장 가까운 경로 선분 방향으로 lookahead_dist 만큼 떨어진 점)
-              size_t next_idx_fb = (nearest_idx_pp + 1) % waypoints_.size();
-              Point2D seg_start_fb = {waypoints_[nearest_idx_pp].x, waypoints_[nearest_idx_pp].y};
+              size_t next_idx_fb = (current_wp_idx_ + 1) % waypoints_.size();
+              Point2D seg_start_fb = {waypoints_[current_wp_idx_].x, waypoints_[current_wp_idx_].y};
               Point2D seg_end_fb = {waypoints_[next_idx_fb].x, waypoints_[next_idx_fb].y};
               Point2D seg_dir_fb = {seg_end_fb.x - seg_start_fb.x, seg_end_fb.y - seg_start_fb.y};
               double seg_mag_fb = std::sqrt(distSq(seg_start_fb, seg_end_fb)); // 이전 답변의 distSq 함수 필요
@@ -358,23 +397,24 @@ void TruckController::compute_control()
 
         // Odometry 발행 및 로깅
         publish_odom(cur_x_, cur_y_, cur_z_, heading);
-        RCLCPP_INFO(this->get_logger(), "[RUNNING] Head: %.3f | TargetAng: %.3f | Alpha: %.3f | Steer: %.3f",
-                 heading, path_angle, alpha, now_steer);
-                 std::cout<< "vel : "<<target_velocity<<std::endl;
+        // RCLCPP_INFO(this->get_logger(), "Head: %.3f | TargetAng: %.3f | Alpha: %.3f | Steer: %.3f",
+        //          heading, path_angle, alpha, now_steer);
+        std::cout<<"Current Waypoint Num : "<<  current_wp_idx_  << std::endl;
+        //std::cout<< "vel : "<<target_velocity<<std::endl;
 
     } // RUNNING 상태 끝
 } // compute_control 끝
 
-void TruckController::load_waypoints(const std::string &csv_path)
+void TruckController::load_waypoints_0(const std::string &csv_path)
 {
-  std::ifstream ifs(csv_path);
+  std::ifstream ifs(csv_path+"0.csv");
   if (!ifs.is_open()) {
     RCLCPP_ERROR(this->get_logger(), "Failed to open waypoint file: %s", csv_path.c_str());
     rclcpp::shutdown(); // 또는 다른 오류 처리 로직
     return;
   }
 
-  waypoints_.clear(); // 기존 웨이포인트 비우기
+  _waypoints_0.clear(); // 기존 웨이포인트 비우기
   std::string line;
   std::getline(ifs, line); // 헤더 라인 스킵
 
@@ -386,8 +426,37 @@ void TruckController::load_waypoints(const std::string &csv_path)
     char comma; // 콤마 무시용
 
     // CSV 형식이 "x,y,z" 라고 가정 (쉼표로 구분)
-    if (ss >> wp.x >> comma >> wp.y >> comma >> wp.z) {
-        waypoints_.push_back(wp);
+    if (ss >> wp.x >> comma >> wp.y >> comma >> wp.z ) {
+        _waypoints_0.push_back(wp);
+    } else {
+        RCLCPP_WARN(this->get_logger(), "Failed to parse waypoint line %d: %s", line_count, line.c_str());
+    }
+}
+}
+
+void TruckController::load_waypoints_1(const std::string &csv_path)
+{
+  std::ifstream ifs(csv_path+"1.csv");
+  if (!ifs.is_open()) {
+    RCLCPP_ERROR(this->get_logger(), "Failed to open waypoint file: %s", csv_path.c_str());
+    rclcpp::shutdown(); // 또는 다른 오류 처리 로직
+    return;
+  }
+
+  _waypoints_1.clear(); // 기존 웨이포인트 비우기
+  std::string line;
+  std::getline(ifs, line); // 헤더 라인 스킵
+
+  Waypoint wp;
+  int line_count = 1;
+  while (std::getline(ifs, line)) {
+    line_count++;
+    std::istringstream ss(line);
+    char comma; // 콤마 무시용
+
+    // CSV 형식이 "x,y,z" 라고 가정 (쉼표로 구분)
+    if (ss >> wp.x >> comma >> wp.y >> comma >> wp.z ) {
+        _waypoints_1.push_back(wp);
     } else {
         RCLCPP_WARN(this->get_logger(), "Failed to parse waypoint line %d: %s", line_count, line.c_str());
     }

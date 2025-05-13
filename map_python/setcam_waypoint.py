@@ -1,6 +1,6 @@
 import carla
-
-def move_camera_to_waypoint(csv_path, index=14782):
+import sys
+def move_camera_to_waypoint(csv_path, index):
     # CARLA 클라이언트 연결
     client = carla.Client('localhost', 2000)
     client.set_timeout(5.0)
@@ -32,10 +32,11 @@ def move_camera_to_waypoint(csv_path, index=14782):
         )
         spectator.set_transform(camera_tf)
         print(f"[INFO] Camera moved to waypoint {index}")
+        print(f"setcam waypoint x:{target_tf.location.x} y:{target_tf.location.y} z:{target_tf.location.z} ")
     else:
         print(f"[WARN] Index {index} is out of range (max: {len(waypoints) - 1})")
 
 # 사용 예시
 if __name__ == '__main__':
-    move_camera_to_waypoint('/home/avees/ros2_ws/src/truck_controller/data/0.csv', index=18280)
+    move_camera_to_waypoint('/home/avees/ros2_ws/src/truck_controller/data/0.csv', index=int(sys.argv[1]))
 

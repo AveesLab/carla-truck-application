@@ -33,11 +33,13 @@ struct Waypoint {
 class TruckController : public rclcpp::Node
 {
 public:
-  TruckController();
+  TruckController(int argu_id);
+  int actor_id_= 99;
 
 private:
   // --- 주요 함수 ---
-  void load_waypoints(const std::string &csv_path);
+  void load_waypoints_0(const std::string &csv_path);
+  void load_waypoints_1(const std::string &csv_path);
   // void gnss_callback(...); // 제거
   void compute_control(); // <<< 이 함수를 수정 (GPS 기반 제어)
   // void imu_callback(...); // 제거
@@ -56,8 +58,11 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_ENU_;
 
   // --- 상태 변수 ---
+  std::vector<Waypoint> _waypoints_0;
+  std::vector<Waypoint> _waypoints_1;
   std::vector<Waypoint> waypoints_;
-  int current_wp_idx_;      // 생성자에서 18250으로 초기화됨
+
+  int current_wp_idx_;      // 생성자에서 0으로 초기화됨
   double cur_x_, cur_y_, cur_z_; // 현재 ENU 위치
   double prev_x_, prev_y_;      // 이전 ENU 위치 (헤딩 추정용)
   double current_yaw_;          // 현재 ENU Yaw (라디안, 추정/초기화됨, NaN으로 시작)
@@ -69,6 +74,7 @@ private:
   double lookahead_dist_; // Kappa 계산 시 사용됨
   double max_speed_;
   double wheel_base_;     // 기본값, 실제 차량 모델 확인 필요
+  double dist_threshold = 5;
 
   // --- 상수 ---
   const double max_steer_angle_rad = 0.7; // <<<=== 실제 차량 최대 조향각(라디안)으로 수정 필요!

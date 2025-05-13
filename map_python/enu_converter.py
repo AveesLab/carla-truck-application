@@ -3,6 +3,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
 from geometry_msgs.msg import Point
+import numpy as np
 import math
 import sys
 
@@ -48,7 +49,7 @@ class TruckPointPublisher(Node):
 
 def main():
     if len(sys.argv) != 2:
-        print("사용법: python3 truck_Point_multi.py <트럭 개수 (1~3)>")
+        print("사용법: python3 enuconverter.py <트럭 개수 (1~3)>")
         return
 
     num_trucks = int(sys.argv[1])

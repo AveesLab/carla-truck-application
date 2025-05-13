@@ -5,24 +5,25 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
 def generate_controllers(context):
-    num = int(LaunchConfiguration('num_trucks').perform(context))
+    num = int(LaunchConfiguration('NumTrucks').perform(context))
     pkg = os.path.join(
       os.getcwd(), 'src', 'truck_controller', 'data')
-    csv0 = os.path.join(pkg, '0.csv')
+    csv = os.path.join(pkg, '')
 
     nodes = []
     for i in range(num):
         nodes.append(Node(
             package='truck_controller',
             executable='truck_controller_node',
-            name=f'controller{i}',
+            name=f'truck_controller_node_{i}',
             output='screen',
-            arguments=[str(i), f'controller{i}'],
+            emulate_tty=True,
+            arguments=[str(i)],
             parameters=[{
-              'csv_path':     csv0,
+              'csv_path':     csv,
               'lookahead_dist': 10.0,
               'max_speed':      0.3,
-              'k_angular':      1.0,
+              'wheel_base':      5.0,
 
  
             }]
@@ -31,7 +32,7 @@ def generate_controllers(context):
 
 def generate_launch_description():
     return LaunchDescription([
-        DeclareLaunchArgument('num_trucks', default_value='1',
+        DeclareLaunchArgument('NumTrucks', default_value='1',
                                description='Number of trucks'),
         OpaqueFunction(function=generate_controllers)
     ])

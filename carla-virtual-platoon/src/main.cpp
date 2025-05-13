@@ -36,11 +36,23 @@ void signal_handler(int signal) {
 
 carla::geom::Location GetTruckLocation(int truck_num, std::string map_name) {
     float x = 0.0f , y = 0.0f ,z =0.0f;
-    if (truckLocations.find(map_name) != truckLocations.end() && truckLocations[map_name].find(truck_num) != truckLocations[map_name].end()) {
-        x = truckLocations[map_name][truck_num][0]+5.0f;
-        y = truckLocations[map_name][truck_num][1];
-        z = truckLocations[map_name][truck_num][2];
-    } else {
+    if (truckLocations.find(map_name) != truckLocations.end() && truckLocations[map_name].find(truck_num) != truckLocations[map_name].end()) 
+    {
+        if(abs(truckRotations[map_name][truck_num][1])>1.0f)
+        {
+            x = truckLocations[map_name][truck_num][0]-5.0f;
+            y = truckLocations[map_name][truck_num][1];
+            z = truckLocations[map_name][truck_num][2];
+        }else
+        {
+            x = truckLocations[map_name][truck_num][0]+5.0f;
+            y = truckLocations[map_name][truck_num][1];
+            z = truckLocations[map_name][truck_num][2];
+
+        }
+    } 
+    else 
+    {
         throw std::runtime_error("Invalid map name or truck index for location.");
     }
 
@@ -66,6 +78,9 @@ carla::geom::Rotation GetTruckRotation(int truck_num, std::string map_name) {
         pitch = truckRotations[map_name][truck_num][0];
         yaw = truckRotations[map_name][truck_num][1];
         roll = truckRotations[map_name][truck_num][2];
+        // pitch = 0.0f;
+        // yaw = -180.0f;
+        // roll = 0.0f;
     } else {
         throw std::runtime_error("Invalid map name or truck index for rotation.");
     }
