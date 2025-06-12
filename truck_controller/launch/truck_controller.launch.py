@@ -1,3 +1,5 @@
+
+
 import os
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
@@ -24,16 +26,20 @@ def generate_controllers(context):
               'lookahead_dist': 10.0,
               'max_speed':      0.3,
               'wheel_base':      5.0,
+              'desired_gap':     10.0,
+              'min_gap':         5.0,
+              'time_gap':         2.0,
+              'max_accel':        2.0,
 
  
             }]
         ))
+
     return nodes
 
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('NumTrucks', default_value='1',
-                               description='Number of trucks'),
+                             description='Number of trucks'),
         OpaqueFunction(function=generate_controllers)
     ])
-

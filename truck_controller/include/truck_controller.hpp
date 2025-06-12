@@ -1,14 +1,15 @@
 #pragma once
 
 #include <rclcpp/rclcpp.hpp>
-#include <ros2_msg/msg/gnss.hpp> // GNSS 제거
-#include <ros2_msg/msg/imu.hpp>  // IMU 제거
+#include <ros2_msg/msg/gnss.hpp>
+#include <ros2_msg/msg/imu.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/float32.hpp>
-#include <geometry_msgs/msg/point.hpp> // ENU 위치 수신용
-#include <nav_msgs/msg/odometry.hpp>   // Odometry 발행용
+#include <std_msgs/msg/empty.hpp>
+#include <geometry_msgs/msg/point.hpp>
+#include <nav_msgs/msg/odometry.hpp>
 #include <GeographicLib/LocalCartesian.hpp>
-#include <sensor_msgs/msg/imu.hpp> // IMU 제거
+#include <sensor_msgs/msg/imu.hpp>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
@@ -17,69 +18,136 @@
 #include <string>
 #include <cmath>
 #include <limits>
+#include <array>
 
 // 컨트롤러 상태 정의
 enum class ControllerState {
-  INITIALIZING_HEADING, // 초기 헤딩 설정을 위해 직진 중
-  RUNNING               // 일반 Pure Pursuit 주행 중
+    INITIALIZING_HEADING,
+    RUNNING
 };
 
-struct Point2D { double x, y; }; // 필요시 사용
+struct Point2D { double x, y; };
 
 struct Waypoint {
-  double x, y, z; // ENU 좌표
+    double x, y, z;
 };
 
 class TruckController : public rclcpp::Node
 {
 public:
-  TruckController(int argu_id);
-  int actor_id_= 99;
+    TruckController(int argu_id);
+    int actor_id_ = 99;
+    int formation_id_ = 99;
 
 private:
-  // --- 주요 함수 ---
-  void load_waypoints_0(const std::string &csv_path);
-  void load_waypoints_1(const std::string &csv_path);
-  // void gnss_callback(...); // 제거
-  void compute_control(); // <<< 이 함수를 수정 (GPS 기반 제어)
-  // void imu_callback(...); // 제거
-  void publish_odom(double cur_x_, double cur_y_, double cur_z_, double yaw);
-  // void gnss_to_carla(...); // load_waypoints 에서 사용한다면 유지
-  void server_enu_callback(const geometry_msgs::msg::Point::SharedPtr msg); // 위치 업데이트 및 compute_control 호출
-  double distSq(Point2D p1, Point2D p2);
-  // --- Subscriber ---
-  // rclcpp::Subscription<...>::SharedPtr sub_gnss_; // 제거
-  // rclcpp::Subscription<...>::SharedPtr sub_imu_;   // 제거
-  rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_server_enu_; // ENU 위치 구독용
+    // 상수 정의
+    const double MIN_GAP = 8.0;       // 최소 간격 (미터)
+    const double DESIRED_GAP = 10.0;   // 희망 간격 (미터)
+    const double EMERGENCY_GAP = 5.0;
+    const double max_steer_angle_rad = 0.7;
+    const double min_dist_threshold_sq = 0.01 * 0.01;
+    const double TRUCK_LENGTH = 16.8;
+    const double TRUCK_WIDTH = 2.5;
+    const double SENSOR_TO_FRONT = 4.0;
+    const double SENSOR_TO_REAR = 12.0;
+    const double STEERING_THRESHOLD = 0.04;                  // 조향각 임계값
+    const double ACC_SPEED = 100.0;
+    const double SLOW_SPEED = 30.0;
+    const double STABLE_SPEED = 70.0;
+    
+    
+    // 멤버 변수
+    //int actor_id_;                     // 트럭 ID
+    //int formation_id_;                 // Formation ID
+    int formation_change_count_;       // Formation 변경 횟수
+    int current_wp_idx_;              // 현재 웨이포인트 인덱스
+    int lane_number_;
+    // 위치 관련 변수
+    double cur_x_, cur_y_, cur_z_;    // 현재 위치
+    double prev_x_, prev_y_;          // 이전 위치
+    double start_x_, start_y_;        // 시작 위치
+    double current_yaw_;              // 현재 방향
+    double prev_steer_;               // 이전 조향각
+    
+    // 속도 제어 관련 변수
+    double current_velocity_;          // 현재 속도
+    double target_velocity_;          // 목표 속도
+    double prev_velocity_;            // 이전 속도
+    double current_steering_;         // 현재 조향각
+    double prev_error_;               // PID 이전 오차
+    double integral_;                 // PID 적분값
+    double dt_;                       // PID 시간 간격
+    double prev_velocity_error_;      // 속도 제어 이전 오차
+    double integral_velocity_error_;  // 속도 제어 적분값
+    
+    // 파라미터
+    double lookahead_dist_;
+    double max_speed_;
+    double wheel_base_;
+    double dist_threshold_;
+    double max_accel_;
+    double min_gap_ = MIN_GAP;
+    double desired_gap_ = DESIRED_GAP;
+    double emergency_gap_ = EMERGENCY_GAP;
+    double time_gap_;
+    double init_dist_ = 5.0;
+    double init_speed_;
+    const double control_dt_ = 0.1;
 
-  // --- Publishers ---
-  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pub_vel_;
-  rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_steer_;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_ENU_;
+    
 
-  // --- 상태 변수 ---
-  std::vector<Waypoint> _waypoints_0;
-  std::vector<Waypoint> _waypoints_1;
-  std::vector<Waypoint> waypoints_;
+    // 웨이포인트 관련
+    std::vector<Waypoint> _waypoints_0;
+    std::vector<Waypoint> _waypoints_1;
+    std::vector<Waypoint> waypoints_;
+    
+    // Formation 관리
+    std::array<geometry_msgs::msg::Point, 3> truck_positions_;
+    ControllerState current_state_;
+    GeographicLib::LocalCartesian geo_converter_;
 
-  int current_wp_idx_;      // 생성자에서 0으로 초기화됨
-  double cur_x_, cur_y_, cur_z_; // 현재 ENU 위치
-  double prev_x_, prev_y_;      // 이전 ENU 위치 (헤딩 추정용)
-  double current_yaw_;          // 현재 ENU Yaw (라디안, 추정/초기화됨, NaN으로 시작)
-  double prev_steer_ = 0.0;     // 조향 스무딩용
-  double start_x_, start_y_;    // Initial position for heading initialization phase
-  ControllerState current_state_; // Controller's current state
-  // --- 파라미터 ---
-  GeographicLib::LocalCartesian geo_converter_; // Waypoint 로딩 시 필요할 수 있음
-  double lookahead_dist_; // Kappa 계산 시 사용됨
-  double max_speed_;
-  double wheel_base_;     // 기본값, 실제 차량 모델 확인 필요
-  double dist_threshold = 5;
+    // Publishers
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pub_vel_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_steer_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_ENU_;
 
-  // --- 상수 ---
-  const double max_steer_angle_rad = 0.7; // <<<=== 실제 차량 최대 조향각(라디안)으로 수정 필요!
-  double init_dist_ = 5.0;      // 초기 직진 거리 (m) (파라미터화 가능)
-  const double min_dist_threshold_sq = 0.01 * 0.01; // 헤딩 추정용 최소 이동 거리 제곱 (m^2)
-  double init_speed_ = 6.0;     // INITIALIZING_HEADING 상태에서의 직진 속도 (파라미터화 가능)
+    // Subscribers
+    rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr sub_formation_change_;
+    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_server_enu_;
+    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck0_pos_;
+    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck1_pos_;
+    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck2_pos_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_current_velocity_;
 
+    // Callback 함수들
+    void formation_change_callback(const std_msgs::msg::Empty::SharedPtr msg);
+    void server_enu_callback(const geometry_msgs::msg::Point::SharedPtr msg);
+    void truck0_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
+    void truck1_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
+    void truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
+    void current_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
+
+    // Formation 관련 함수들
+    void update_formation_id();
+    int calculate_leader_truck_number();
+
+    // 속도 제어 관련 함수들
+    double get_reference_velocity(int fid, double distance_to_leader);
+    double adjust_velocity_for_steering(double base_velocity, double steering);
+    double calculate_pid_output(double current_vel, double target_vel, 
+                              double kp, double ki, double kd);
+    double normalize_control_output(double pid_output);
+    double calculate_platoon_velocity(double current_fid, 
+                                    double distance_to_leader,
+                                    double current_velocity,
+                                    double current_steering);
+    double get_distance_to_leader();
+
+    // 유틸리티 함수들
+    void compute_control();
+    void load_waypoints_0(const std::string &csv_path);
+    void load_waypoints_1(const std::string &csv_path);
+    double distSq(Point2D p1, Point2D p2);
+    //double calculate_target_velocity(double steer_angle);
+    void publish_odom(double cur_x_, double cur_y_, double cur_z_, double yaw);
 };

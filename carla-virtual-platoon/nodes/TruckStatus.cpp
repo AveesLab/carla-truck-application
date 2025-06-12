@@ -110,10 +110,10 @@ void TruckStatusPublisher::TruckStatusPublisher_accel_callback() {
 void TruckStatusPublisher::TruckStatusPublisher_velocity_callback() {
     vel_ = Vehicle_->GetVelocity();
     auto message = std_msgs::msg::Float32();
-    float result_vel = vel_.x; // m/s
-    //result_vel = std::round(result_vel * 100.0f) / 100.0f;
+    // 3차원 속도 벡터의 크기 계산
+    float result_vel = std::sqrt(vel_.x * vel_.x + vel_.y * vel_.y + vel_.z * vel_.z);
     message.data = result_vel;
-    std::cerr << message.data  << std::endl;
+    std::cout << message.data  << std::endl;
     velocity_ = result_vel;
     VelocityPublisher_->publish(message);
 }

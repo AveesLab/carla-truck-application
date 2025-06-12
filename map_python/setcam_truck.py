@@ -3,6 +3,7 @@ from rclpy.node import Node
 from nav_msgs.msg import Odometry
 import carla
 import math
+import sys
 
 
 def quaternion_to_yaw(x, y, z, w):
@@ -12,7 +13,7 @@ def quaternion_to_yaw(x, y, z, w):
     return math.atan2(siny_cosp, cosy_cosp) * 180.0 / math.pi  # deg
 
 class CameraFollower(Node):
-    def __init__(self):
+    def __init__(self,argv_input):
         super().__init__('odom_camera_follower')
 
         # CARLA 클라이언트 연결
@@ -21,8 +22,10 @@ class CameraFollower(Node):
         self.world = self.client.get_world()
         self.spectator = self.world.get_spectator()
 
+        ns =  '/truck' + argv_input + '/ENU' 
+
         # Odometry 구독
-        self.create_subscription(Odometry, '/truck0/ENU', self.odom_callback, 10)
+        self.create_subscription(Odometry, ns, self.odom_callback, 10)
 
     def odom_callback(self, msg: Odometry):
         pos = msg.pose.pose.position
@@ -41,7 +44,7 @@ class CameraFollower(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    node = CameraFollower()
+    node = CameraFollower(sys.argv[1])
     rclpy.spin(node)
     rclpy.shutdown()
 

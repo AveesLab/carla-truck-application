@@ -44,12 +44,20 @@ void TruckControl::VelocitySubCallback(const std_msgs::msg::Float64::SharedPtr m
     if (control_value >= 0) {
         this->control.throttle = control_value;
         this->control.brake = 0;
+        this->control.hand_brake = false;
     }
     else if (control_value < 0) {
         this->control.throttle = 0;
+        if(control_value < -10.0) 
+        {
+            this->control.hand_brake = true;
+            control_value = -1;
+        }
+        else this->control.hand_brake = false;
+
         this->control.brake = -control_value;
     }
-   RCLCPP_INFO(this->get_logger(), "conttrol pub %lf",control_value);
+   //RCLCPP_INFO(this->get_logger(), "conttrol pub %lf",control_value);
     Vehicle_->ApplyControl(control);
     if(sync_ || sync_with_delay) {
         std_msgs::msg::Int32 msg;
@@ -57,3 +65,4 @@ void TruckControl::VelocitySubCallback(const std_msgs::msg::Float64::SharedPtr m
         SyncThrottlePublisher_->publish(msg);
     }
 }
+
