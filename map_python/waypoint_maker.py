@@ -5,12 +5,12 @@ import math
 
 def main():
     client = carla.Client("localhost", 2000)
-    client.set_timeout(10.0)
-    world = client.load_world("Town06")
+    client.set_timeout(20.0)
+    world = client.load_world("mid_large_cycle")
     carla_map = world.get_map()
 
     # 시작점 지정
-    truck_spawn = carla.Location(x=33.215,  y=-16.058,z=  0.0)
+    truck_spawn = carla.Location(x=18980,  y=19509.0,z=  2.0)
     start_wp = carla_map.get_waypoint(
         truck_spawn,
         project_to_road=True,
@@ -51,7 +51,7 @@ def main():
         wp = next_wps[0]
 
     # CSV 저장
-    save_dir = os.path.expanduser("~/ros2_ws/src/town06_data")
+    save_dir = os.path.expanduser("~/ros2_ws/src/data")
     os.makedirs(save_dir, exist_ok=True)
     csv_path = os.path.join(save_dir, "0.csv")
     with open(csv_path, 'w', newline='') as f:

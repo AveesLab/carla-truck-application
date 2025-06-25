@@ -13,7 +13,7 @@ class CarlaWaypointVisualizer(Node):
         
         # CARLA 클라이언트 연결
         self.client = carla.Client('localhost', 2000)
-        self.client.set_timeout(10.0)
+        self.client.set_timeout(40.0)
         self.world = self.client.get_world()
 
         # 경로 저장
@@ -58,23 +58,36 @@ class CarlaWaypointVisualizer(Node):
             # else:
             #     color = carla.Color(255, 0, 0)  # Red
 
+            if 0 <= i <= 1800+300 :
+            # 1 before curve
+                self.world.debug.draw_string(self.waypoints[i].location, 'O', draw_shadow=False,
+                color=carla.Color(r=0,  g=255, b=0), life_time=LT,
+                persistent_lines=True)
 
-            if 0 <= i <= 50 :
+            elif 78100-300 <= i <= 79600+300 :
+            # 2 curve
                 self.world.debug.draw_string(self.waypoints[i].location, 'O', draw_shadow=False,
                 color=carla.Color(r=0,  g=255, b=0), life_time=LT,
                 persistent_lines=True)
-            elif 7200 <= i <= 0 :
+
+
+            elif 155900-300 <= i <= 157400+300 :
+            # 3 curve
                 self.world.debug.draw_string(self.waypoints[i].location, 'O', draw_shadow=False,
                 color=carla.Color(r=0,  g=255, b=0), life_time=LT,
                 persistent_lines=True)
-            elif 6500 <= i <= 6600 :
+
+            elif 233250-300 <= i <= 235750+300 :
+            # 4 curve
                 self.world.debug.draw_string(self.waypoints[i].location, 'O', draw_shadow=False,
                 color=carla.Color(r=0,  g=255, b=0), life_time=LT,
                 persistent_lines=True)
-            else:
-                self.world.debug.draw_string(wp1, 'O', draw_shadow=False,
-                color=carla.Color(r=255, g=0, b=0), life_time=LT,
-                persistent_lines=True)
+
+
+            # else:
+            #     self.world.debug.draw_string(wp1, 'O', draw_shadow=False,
+            #     color=carla.Color(r=255, g=0, b=0), life_time=LT,
+            #     persistent_lines=True)
 
 
 

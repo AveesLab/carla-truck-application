@@ -7,7 +7,7 @@ def main():
     # 1) CARLA 서버 연결 & 맵 로드
     client = carla.Client("localhost", 2000)
     client.set_timeout(10.0)
-    world = client.load_world("ihp_sce")   # 맵 이름을 ihp_sce로
+    world = client.load_world("mid_large_cycle")   # 맵 이름을 ihp_sce로
     carla_map = world.get_map()
 
     # 2) 시작 웨이포인트: 토폴로지의 첫 번째 세그먼트 시작점

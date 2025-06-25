@@ -75,6 +75,7 @@ TruckOBU::TruckOBU(boost::shared_ptr<carla::client::Vehicle> vehicle_, boost::sh
         }
     }
 
+
     auto v2x_custom_bp = blueprint_library->Find("sensor.other.v2x_custom");
     if (!v2x_custom_bp) {
         std::cerr << "[TruckOBU]  sensor.other.v2x_custom blueprint not found! Skipping V2X Custom Sensor creation." << std::endl;
@@ -116,6 +117,7 @@ TruckOBU::TruckOBU(boost::shared_ptr<carla::client::Vehicle> vehicle_, boost::sh
             }
         });
     }
+
 }
 
 void TruckOBU::EmergencyFlagSubCallback(const std_msgs::msg::Bool::SharedPtr msg) {

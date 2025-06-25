@@ -36,7 +36,7 @@ class CameraFollower(Node):
 
         # 카메라를 차량 위에서 헤딩 방향으로 배치
         cam_tf = carla.Transform(
-            carla.Location(x=x-45*math.cos(yaw*math.pi/180), y=y-45*math.sin(yaw*math.pi/180), z=z + 25),  # 위에서
+            carla.Location(x=x-75*math.cos(yaw*math.pi/180), y=y-75*math.sin(yaw*math.pi/180), z=z + 40),  # 위에서
             carla.Rotation(pitch=-25, yaw=yaw)  # 트럭 방향
         )
         self.spectator.set_transform(cam_tf)

@@ -6,6 +6,7 @@
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/float32.hpp>
 #include <std_msgs/msg/empty.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <GeographicLib/LocalCartesian.hpp>
@@ -32,6 +33,12 @@ struct Waypoint {
     double x, y, z;
 };
 
+struct Missionidx
+{
+    int start_idx;
+    int finish_idx;   
+};
+
 class TruckController : public rclcpp::Node
 {
 public:
@@ -41,9 +48,7 @@ public:
 
 private:
     // 상수 정의
-    const double MIN_GAP = 8.0;       // 최소 간격 (미터)
-    const double DESIRED_GAP = 10.0;   // 희망 간격 (미터)
-    const double EMERGENCY_GAP = 5.0;
+
     const double max_steer_angle_rad = 0.7;
     const double min_dist_threshold_sq = 0.01 * 0.01;
     const double TRUCK_LENGTH = 16.8;
@@ -51,9 +56,22 @@ private:
     const double SENSOR_TO_FRONT = 4.0;
     const double SENSOR_TO_REAR = 12.0;
     const double STEERING_THRESHOLD = 0.04;                  // 조향각 임계값
-    const double ACC_SPEED = 100.0;
-    const double SLOW_SPEED = 30.0;
-    const double STABLE_SPEED = 70.0;
+
+    const Missionidx Curve_idx_1 ={300-300,1800+300};
+    const Missionidx Curve_idx_2 ={78100-300,79600+300};
+    const Missionidx Curve_idx_3= {155900-300,157400+300};
+    const Missionidx Curve_idx_4= {233250-300,235750+300};
+
+    // const Missionidx Straight_idx_1 ={1800 + 7500,78100 - 7500};
+    // const Missionidx Straight_idx_2 ={79600 + 7500,155900 - 7500};
+    // const Missionidx Straight_idx_3 ={157400 + 7500,233250 - 7500}; 
+    // const Missionidx Straight_idx_4 ={235750 + 7500,311000 - 6000};
+
+
+
+
+    
+
     
     
     // 멤버 변수
@@ -80,19 +98,43 @@ private:
     double prev_velocity_error_;      // 속도 제어 이전 오차
     double integral_velocity_error_;  // 속도 제어 적분값
     
+    // 성능 측정 변수들
+    long long loop_computation_time_us_;  // 반복문 연산 시간 (마이크로초)
+    double loop_memory_usage_kb_;         // 반복문 메모리 사용량 (KB)
+    
     // 파라미터
     double lookahead_dist_;
-    double max_speed_;
-    double wheel_base_;
+    double curve_lookahead_dist_;
+    double straight_lookahead_dist_;
+    double WHEEL_BASE_;
     double dist_threshold_;
-    double max_accel_;
-    double min_gap_ = MIN_GAP;
-    double desired_gap_ = DESIRED_GAP;
-    double emergency_gap_ = EMERGENCY_GAP;
-    double time_gap_;
+    double min_gap_;
+    double desired_gap_;
+    double emergency_gap_;
+    double ACC_SPEED_;
+    double SLOW_SPEED_;
+    double STABLE_SPEED_;
+    
     double init_dist_ = 5.0;
     double init_speed_;
-    const double control_dt_ = 0.1;
+    bool deadband_flag_ = true; 
+
+    // 차선변경 관련 플래그 
+    bool formation_change_end_flag_ = false;
+    bool start_lane_change_flag_ = true;
+    bool doing_lane_change_flag_ = false;
+    bool overrun_lane_change_flag_ = false;
+    bool lane_change_flag_ = false;
+    bool decrease_speed_flag_ = false;
+    int start_lane_change_idx_;     //차선변경 시작 웨이포인트 인덱스
+    int overrun_lane_change_idx_;       //overrun 차량 웨이포인트 인덱스
+
+    double distance_to_leader_;
+    double throttle_value_;
+
+
+    
+
 
     
 
@@ -110,17 +152,21 @@ private:
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pub_vel_;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_steer_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_ENU_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_lane_change_end_flag_;
 
     // Subscribers
-    rclcpp::Subscription<std_msgs::msg::Empty>::SharedPtr sub_formation_change_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_formation_end_change_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_server_enu_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck0_pos_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck1_pos_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck2_pos_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_current_velocity_;
 
+    // 타이머 (주기적 제어용)
+    rclcpp::TimerBase::SharedPtr timer_;
+
     // Callback 함수들
-    void formation_change_callback(const std_msgs::msg::Empty::SharedPtr msg);
+    void formation_change_end_callback(const std_msgs::msg::Bool::SharedPtr msg);
     void server_enu_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck0_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck1_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
@@ -128,7 +174,7 @@ private:
     void current_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
 
     // Formation 관련 함수들
-    void update_formation_id();
+
     int calculate_leader_truck_number();
 
     // 속도 제어 관련 함수들
@@ -137,7 +183,7 @@ private:
     double calculate_pid_output(double current_vel, double target_vel, 
                               double kp, double ki, double kd);
     double normalize_control_output(double pid_output);
-    double calculate_platoon_velocity(double current_fid, 
+    double calculate_platoon_velocity(int current_fid, 
                                     double distance_to_leader,
                                     double current_velocity,
                                     double current_steering);
@@ -150,4 +196,11 @@ private:
     double distSq(Point2D p1, Point2D p2);
     //double calculate_target_velocity(double steer_angle);
     void publish_odom(double cur_x_, double cur_y_, double cur_z_, double yaw);
+    void check_mission_state_(int cur_idx_);    
+
+    void check_overrun();
+    void check_lane_change_end();
+    void update_formation_id();
+    
+
 };

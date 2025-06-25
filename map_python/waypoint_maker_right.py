@@ -5,16 +5,16 @@ import math
 
 def main():
     client = carla.Client("localhost", 2000)
-    client.set_timeout(10.0)
-    world = client.load_world("Town04_Opt")
+    client.set_timeout(20.0)
+    world = client.load_world("mid_large_cycle")
     carla_map = world.get_map()
 
     # 시작점 지정
-    truck_spawn = carla.Location(x=-270.990, y=27.0, z=2.0)
+    truck_spawn = carla.Location(x=18980, y=19509, z=2.0)
     start_wp = carla_map.get_waypoint(truck_spawn, project_to_road=True, lane_type=carla.LaneType.Driving)
 
     # 오른쪽 차선으로 이동
-    right_wp = start_wp.get_right_lane()
+    right_wp = start_wp.get_left_lane()
     if right_wp is None or right_wp.lane_type != carla.LaneType.Driving:
         print("[ERROR] 오른쪽 주행 차선을 찾을 수 없습니다.")
         return

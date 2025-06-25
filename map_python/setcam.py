@@ -3,13 +3,13 @@ import math
 
 # 스폰 위치 수동 지정 (예: Town04_Opt의 트럭 0 위치)
 truck_spawn_locations = {
-    "Town04_Opt": {
+    "ihp_sce": {
         0: {  # truck_num 0
-            "x": -5.0,
-            "y": 130.0,
-            "z": 0.3,
+            "x": -62498.438,
+            "y": 8760.877,
+            "z": 1,
             "pitch": 0.0,
-            "yaw": 0.0,
+            "yaw": -15.38,
             "roll": 0.0
         }
     }

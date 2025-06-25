@@ -47,21 +47,35 @@ class CarlaWaypointVisualizer(Node):
             wp1 = self.waypoints[i].location
             wp2 = self.waypoints[i + 1].location
 
-            # # 1800~1850 구간만 초록색, 나머지는 빨간색
-            # if 1400 <= i <= 2000:
-            #     color = carla.Color(255, 127, 0)  # orange
-            # else:
-            #     color = carla.Color(255, 127, 0)  # orange
+            if 0 <= i <= 1800+300 :
+            # 1 before curve
+                self.world.debug.draw_string(self.waypoints[i].location, 'O', draw_shadow=False,
+                color=carla.Color(r=0,  g=255, b=0), life_time=LT,
+                persistent_lines=True)
 
-            # self.world.debug.draw_line(
-            #     wp1, wp2,
-            #     thickness=0.1,
-            #     color=color,
-            #     life_time=LT
-            # )
-            self.world.debug.draw_string(wp1, 'O', draw_shadow=False,
-            color=carla.Color(r=255, g=127, b=0), life_time=LT,
-            persistent_lines=True)
+            elif 78100-300 <= i <= 79600+300 :
+            # 2 curve
+                self.world.debug.draw_string(self.waypoints[i].location, 'O', draw_shadow=False,
+                color=carla.Color(r=0,  g=255, b=0), life_time=LT,
+                persistent_lines=True)
+
+
+            elif 155900-300 <= i <= 157400+300 :
+            # 3 curve
+                self.world.debug.draw_string(self.waypoints[i].location, 'O', draw_shadow=False,
+                color=carla.Color(r=0,  g=255, b=0), life_time=LT,
+                persistent_lines=True)
+
+            elif 233250-300 <= i <= 235750+300 :
+            # 4 curve
+                self.world.debug.draw_string(self.waypoints[i].location, 'O', draw_shadow=False,
+                color=carla.Color(r=0,  g=255, b=0), life_time=LT,
+                persistent_lines=True)
+
+            # else:
+            #     self.world.debug.draw_string(wp1, 'O', draw_shadow=False,
+            #     color=carla.Color(r=127, g=127, b=0), life_time=LT,
+            #     persistent_lines=True)
 
 def main(args=None):
     rclpy.init(args=args)

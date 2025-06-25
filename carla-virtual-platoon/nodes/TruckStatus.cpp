@@ -113,7 +113,7 @@ void TruckStatusPublisher::TruckStatusPublisher_velocity_callback() {
     // 3차원 속도 벡터의 크기 계산
     float result_vel = std::sqrt(vel_.x * vel_.x + vel_.y * vel_.y + vel_.z * vel_.z);
     message.data = result_vel;
-    std::cout << message.data  << std::endl;
+    std::cout << message.data * 3.6  << " km/h" << std::endl;
     velocity_ = result_vel;
     VelocityPublisher_->publish(message);
 }
@@ -162,7 +162,7 @@ void TruckStatusPublisher::recordData(struct timeval startTime){
     char buf[256] = {0x00,};
     static bool flag = false;
     double diff_time;
-    log_path_ = "/home/nvidia/ros2_ws/logfiles/";
+    log_path_ = "/home/avees/ros2_ws/logfiles/";
     std::ifstream read_file;
     std::ofstream write_file;
     if(!flag){

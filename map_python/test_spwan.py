@@ -3,7 +3,7 @@ import carla
 client = carla.Client("localhost", 2000)
 client.set_timeout(10.0)
 
-world = client.load_world("Town06")
+world = client.load_world("mid_large_cycle")
 carla_map = world.get_map()
 
 waypoints = carla_map.generate_waypoints(distance=2.0)

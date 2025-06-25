@@ -17,7 +17,6 @@ public:
         //obu->Stop();
         //obu->Destroy();
 
-        obu_custom->Destroy();
     }
 private:
     void publishV2X(const unsigned int stationid_);

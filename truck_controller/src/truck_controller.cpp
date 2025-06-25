@@ -8,6 +8,8 @@
 #include <string>
 #include <array>
 
+#include <unistd.h>   // getpid()를 위해 추가
+
 TruckController::TruckController(int argu_id)
 : Node("truck_controller_node_" + std::to_string(argu_id)),
   current_wp_idx_(0), // 요청대로 시작 인덱스 초기화
@@ -18,7 +20,7 @@ TruckController::TruckController(int argu_id)
   init_speed_(10.0),
   dist_threshold_(5.0),    // 웨이포인트 탐색 거리 임계값
   init_dist_(2.0),         // 초기 직진 주행 거리
-  dt_(0.02),               // 제어 주기 (50Hz)
+  dt_(0.01),               // 제어 주기 Hz
   integral_(0.0),          // PID 적분항
   prev_error_(0.0),         // PID 이전 오차
   lane_number_(0)
@@ -38,28 +40,36 @@ TruckController::TruckController(int argu_id)
 
   // --- 파라미터 선언 및 값 가져오기 ---
   this->declare_parameter<std::string>("csv_path", "");
-  this->declare_parameter<double>("lookahead_dist"); 
-  //this->declare_parameter<double>("max_speed");     
-  this->declare_parameter<double>("wheel_base");    
+  this->declare_parameter<double>("curve_lookahead_dist"); 
+  this->declare_parameter<double>("straight_lookahead_dist"); 
+
+  this->declare_parameter<double>("ACC_SPEED");     
+  this->declare_parameter<double>("SLOW_SPEED");     
+  this->declare_parameter<double>("STABLE_SPEED");     
+
+  this->declare_parameter<double>("WHEEL_BASE");    
+  this->declare_parameter<double>("MIN_GAP");
+  this->declare_parameter<double>("DESIRED_GAP");
+  this->declare_parameter<double>("EMERGENCY_GAP");
 
   // 군집 주행 관련 파라미터 선언
-  //this->declare_parameter<double>("desired_gap", 20.0);  // 기본 20m
-  //this->declare_parameter<double>("min_gap", 10.0);      // 최소 안전거리 10m
-  this->declare_parameter<double>("time_gap", 2.0);      // 시간 간격 2초
-  //this->declare_parameter<double>("max_accel", 2.0);     // 최대 가속도 2m/s^2
+
 
   std::string csv_path;
 
   this->get_parameter("csv_path", csv_path);
-  this->get_parameter("lookahead_dist", lookahead_dist_);
-  this->get_parameter("max_speed", max_speed_);
-  this->get_parameter("wheel_base", wheel_base_);
+  this->get_parameter("curve_lookahead_dist", curve_lookahead_dist_);
+  this->get_parameter("straight_lookahead_dist", straight_lookahead_dist_);
 
-  // 파라미터 가져오기
-  //this->get_parameter("desired_gap", desired_gap_);
-  //this->get_parameter("min_gap", min_gap_);
-  this->get_parameter("time_gap", time_gap_);
-  //this->get_parameter("max_accel", max_accel_);
+  this->get_parameter("ACC_SPEED", ACC_SPEED_);
+  this->get_parameter("SLOW_SPEED", SLOW_SPEED_);
+  this->get_parameter("STABLE_SPEED", STABLE_SPEED_);
+
+  this->get_parameter("WHEEL_BASE", WHEEL_BASE_);
+  this->get_parameter("MIN_GAP", min_gap_);
+  this->get_parameter("DESIRED_GAP", desired_gap_);
+  this->get_parameter("EMERGENCY_GAP", emergency_gap_);
+
 
   // --- 상태 변수 초기화 ---
   prev_x_ = std::numeric_limits<double>::quiet_NaN(); // 이전 위치 없음 표시
@@ -101,6 +111,7 @@ TruckController::TruckController(int argu_id)
   pub_vel_ = this->create_publisher<std_msgs::msg::Float64>(ns + "/velocity_control", 10);
   pub_steer_ = this->create_publisher<std_msgs::msg::Float32>(ns + "/steer_control", 10);
   pub_ENU_ = this->create_publisher<nav_msgs::msg::Odometry>(ns + "/ENU", 10 );
+  pub_lane_change_end_flag_ = this->create_publisher<std_msgs::msg::Bool>("/lane_change_end_flag", 10);
 
   // 자신의 위치 업데이트를 위한 구독
   sub_server_enu_ = this->create_subscription<geometry_msgs::msg::Point>(
@@ -128,9 +139,14 @@ TruckController::TruckController(int argu_id)
       std::bind(&TruckController::current_velocity_callback, this, std::placeholders::_1));
       
   // Formation 변경 구독
-  sub_formation_change_ = this->create_subscription<std_msgs::msg::Empty>(
-      "/formation_change", 10,
-      std::bind(&TruckController::formation_change_callback, this, std::placeholders::_1));
+  sub_formation_end_change_ = this->create_subscription<std_msgs::msg::Bool>(
+      "/lane_change_end_flag", 10,
+      std::bind(&TruckController::formation_change_end_callback, this, std::placeholders::_1));
+      
+  // 200Hz 제어 타이머 추가
+  timer_ = this->create_wall_timer(
+      std::chrono::milliseconds(10),  // 200Hz = 5ms // 100Hz = 10ms
+      std::bind(&TruckController::compute_control, this));
       
   //RCLCPP_INFO(this->get_logger(), "TruckController node initialized (IMU-less GPS Steer Mode). Yaw will be initialized on first control cycle.");
 
@@ -168,74 +184,20 @@ void TruckController::server_enu_callback(const geometry_msgs::msg::Point::Share
        // RCLCPP_INFO(this->get_logger(), "Stored starting position: (%.2f, %.2f)", start_x_, start_y_);
     }
 
-    // 제어 로직 호출
-    compute_control();
+    // 제어 로직은 별도 타이머에서 50Hz로 실행됨
 }
 
 
 
-
-// // 조향각과 거리 기반 속도 계산
-// double TruckController::calculate_target_velocity(double steer_angle) {
-//     // km/h를 m/s로 변환
-//     const double BASE_SPEED = 60.0 * (1000.0 / 3600.0);     // 60 km/h -> 16.67 m/s
-//     const double SLOW_SPEED = 30.0 * (1000.0 / 3600.0);     // 30 km/h -> 8.33 m/s
-//     const double CATCH_UP_SPEED = 70.0 * (1000.0 / 3600.0); // 70 km/h -> 19.44 m/s
-//     const double STEERING_THRESHOLD = 0.04;
-
-//     // 선행 차량과의 거리 계산
-//     double distance_to_leader = 0.0;
-//     int leader_id = formation_id_ - 1;  // 현재 차량의 formation_id에서 1을 뺀 값이 선행 차량의 ID
-//     double target_velocity;
-    
-//     if (leader_id >= 0) {  // 선두 차량이 아닌 경우
-//         const auto& leader_pos = truck_positions_[leader_id];
-//         double dx = leader_pos.x - cur_x_;
-//         double dy = leader_pos.y - cur_y_;
-//         distance_to_leader = std::sqrt(dx*dx + dy*dy);
-
-//         // 거리에 따른 속도 결정
-//         if (distance_to_leader < min_gap_) {
-//             target_velocity = SLOW_SPEED;  // 30 km/h
-//             RCLCPP_DEBUG(this->get_logger(), "Close to leader (%.2f m), reducing speed to %.2f m/s", 
-//                         distance_to_leader, SLOW_SPEED);
-//         } else if (distance_to_leader > desired_gap_) {
-//             target_velocity = CATCH_UP_SPEED;  // 70 km/h
-//             RCLCPP_DEBUG(this->get_logger(), "Far from leader (%.2f m), increasing speed to %.2f m/s", 
-//                         distance_to_leader, CATCH_UP_SPEED);
-//         } else {
-//             target_velocity = BASE_SPEED;  // 60 km/h
-//             RCLCPP_DEBUG(this->get_logger(), "Maintaining base speed %.2f m/s", BASE_SPEED);
-//         }
-//     } else {
-//         // 선두 차량은 기본 속도로 주행
-//         target_velocity = BASE_SPEED;  // 60 km/h
-//         RCLCPP_DEBUG(this->get_logger(), "Lead truck, maintaining base speed %.2f m/s", BASE_SPEED);
-//     }
-    
-//     // 조향각이 임계값보다 크면 속도 감소
-//     if (std::abs(steer_angle) > STEERING_THRESHOLD) {
-//         target_velocity *= (1.0/3.0);  // 속도를 1/3로 감소
-//         RCLCPP_DEBUG(this->get_logger(), "High steering angle (%.3f), reducing speed to %.2f m/s", 
-//                     steer_angle, target_velocity);
-//     }
-    
-//     // 최대 속도 제한
-//     //target_velocity = std::min(target_velocity, max_speed_);
-    
-
-//     std::cout << "distance_to_leader: " << distance_to_leader << "m" << "  " << "speed : "<< target_velocity * 3.6 << "km/h" << std::endl;
-    
-//     return target_velocity;
-// }
-
 // Formation 변경 시 새로운 FID 계산
 void TruckController::update_formation_id() {
+    if(actor_id_ == 0){
+        std::cout<<"update_formation_id 호출"<<std::endl;
+    }
+    formation_change_count_++;
     // Formation 변경 시 FID 순환: 0->2, 1->0, 2->1
     formation_id_ = (formation_id_ + 2) % 3;
-    //RCLCPP_INFO(this->get_logger(), 
-    //    "Formation changed (count: %d) - Actor %d new FID: %d",
-    //    formation_change_count_, actor_id_, formation_id_);
+
 }
 
 // 현재 FID에 따른 선행 트럭 번호 계산
@@ -248,8 +210,6 @@ int TruckController::calculate_leader_truck_number() {
     int base_truck = (actor_id_ - formation_change_count_) % 3;
     if (base_truck < 0) base_truck += 3;
     
-    // 현재 FID가 1이면 FID 0을, FID가 2면 FID 1을 추종
-    int leader_fid = formation_id_ - 1;
     
     // leader_fid를 가진 트럭의 번호 계산
     int leader_truck = (base_truck - 1 + 3) % 3;
@@ -258,81 +218,16 @@ int TruckController::calculate_leader_truck_number() {
 }
 
 // Formation 변경 콜백
-void TruckController::formation_change_callback(const std_msgs::msg::Empty::SharedPtr msg) {
-    formation_change_count_++;
-    update_formation_id();
+void TruckController::formation_change_end_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+    //true면 차선변경 끝났다는 뜻 -> check_overrrun 실행
+    //false면 차선변경 중이라는 뜻
+    if(lane_change_flag_ == true){
+    if(formation_id_ != 0){
+        formation_change_end_flag_ = msg->data;
+    }
+    }
 }
 
-// // 군집 주행 시 속도 계산
-// double TruckController::calculate_platoon_velocity() {
-//     if (formation_id_ == 0) {
-//         return max_speed_;
-//     }
-
-//     // 선행 트럭 번호 계산
-//     int leader_truck = calculate_leader_truck_number();
-//     if (leader_truck == -1 || leader_truck >= 3) {
-//         RCLCPP_WARN(this->get_logger(), "Invalid leader truck number: %d", leader_truck);
-//         return prev_velocity_;
-//     }
-
-//     // 선행 차량의 위치 유효성 검사
-//     if (leader_truck < 0 || leader_truck >= static_cast<int>(truck_positions_.size())) {
-//         RCLCPP_ERROR(this->get_logger(), "Leader truck index out of bounds: %d", leader_truck);
-//         return prev_velocity_;
-//     }
-
-//     const auto& leader_pos = truck_positions_[leader_truck];
-//     if (std::isnan(leader_pos.x) || std::isnan(leader_pos.y)) {
-//         RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
-//             "Leader truck %d position is invalid", leader_truck);
-//         return prev_velocity_;
-//     }
-
-//     // 거리 계산 (트럭의 물리적 크기 고려)
-//     double dx = leader_pos.x - cur_x_;
-//     double dy = leader_pos.y - cur_y_;
-//     double center_distance = std::sqrt(dx*dx + dy*dy);
-    
-//     // 트럭의 물리적 크기를 고려한 실제 거리 계산
-//     double actual_distance = center_distance - TRUCK_LENGTH;  // 트럭 길이만큼 차감
-    
-//     // 실제 거리가 음수인 경우 (충돌 상태) 0으로 처리
-//     if (actual_distance < 0) {
-//         actual_distance = 0;
-//     }
-    
-//     std::cout << "Center distance: " << center_distance << "m, Actual distance: " << actual_distance << "m" << std::endl;
-    
-//     // 거리에 따른 속도 조절 (부드러운 변화)
-//     if (actual_distance < min_gap_) {
-//         std::cout << "  ----------here we stop (actual distance: " << actual_distance << "m)  ";
-//         return 0.0;
-//     }
-    
-//     if (actual_distance > desired_gap_) {
-//         double excess_ratio = (actual_distance - desired_gap_) / desired_gap_;
-//         double speed_increase = std::min(excess_ratio, 0.5);  // 최대 50% 증가
-//         std::cout << "----------here we go (actual distance: " << actual_distance << "m)  ";
-//         return max_speed_ * (1.0 + speed_increase);
-//     }
-    
-//     // min_gap과 desired_gap 사이에서 선형 보간
-//     double ratio = (actual_distance - min_gap_) / (desired_gap_ - min_gap_);
-//     return max_speed_ * (0.6 + (ratio * 0.4));  // 60%~100% 사이에서 선형 변화
-// }
-
-// 가속도 제한 적용
-// double TruckController::apply_acceleration_limits(double target_velocity) {
-//     double accel = (target_velocity - prev_velocity_) / control_dt_;
-    
-//     if (std::abs(accel) > max_accel_) {
-//         target_velocity = prev_velocity_ + 
-//             (accel > 0 ? max_accel_ : -max_accel_) * control_dt_;
-//     }
-    
-//     return target_velocity;
-// }
 
 // 상태 기반 제어 로직
 void TruckController::compute_control()
@@ -341,6 +236,10 @@ void TruckController::compute_control()
         //RCLCPP_WARN_ONCE(this->get_logger(), "Waiting for valid position or waypoints.");
         return;
     }
+
+    // 지역 변수 선언 (함수 전체에서 사용)
+    double distance_to_leader = 0.0;
+    double throttle_value = 0.0;
 
     // === 상태 머신 ===
     if (current_state_ == ControllerState::INITIALIZING_HEADING)
@@ -419,8 +318,6 @@ void TruckController::compute_control()
     // === RUNNING 상태 로직 ===
     if (current_state_ == ControllerState::RUNNING)
     {
-
-
         // --- 1. 헤딩 추정 (이동량 기반) ---
         bool heading_updated_this_cycle = false;
         if (!std::isnan(prev_x_) && !std::isnan(prev_y_)) 
@@ -467,7 +364,9 @@ void TruckController::compute_control()
         // --- 헤딩 추정 끝 ---
 
         // --- 2. Pure Pursuit 로직 (이전과 동일) ---
-        int max_iterations = 100;  // 최대 반복 횟수 제한
+
+        
+        int max_iterations = 10;  // 최대 반복 횟수 제한
         int iteration_count = 0;
         
         while(iteration_count < max_iterations)
@@ -528,6 +427,9 @@ void TruckController::compute_control()
             }
             iteration_count++;
         }
+        
+
+        
 
         if (iteration_count >= max_iterations) {
 
@@ -548,12 +450,29 @@ void TruckController::compute_control()
             }
             current_wp_idx_ = closest_idx;
         }
-        //for lane change
-         if(current_wp_idx_ > 160 && current_wp_idx_<180)
-         {  
-            lane_number_=1;
-            waypoints_=_waypoints_1;
-         }
+        
+        check_mission_state_(current_wp_idx_);
+        //for lane_change flag test
+        if(deadband_flag_ == true)
+        {
+ 
+            if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
+            if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
+            if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
+            if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
+            if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
+            if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
+            if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
+            if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
+            if(current_wp_idx_ > 16700 && current_wp_idx_<16800) lane_change_flag_=true;
+            if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
+            if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
+            if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
+        }
+
+
+
+        //std::cout<<"formation_change_count_ : "<<formation_change_count_<<std::endl;
 
         // --- [수정됨] 목표점 찾기 (Lookahead Distance 기반 기하학적 탐색) ---
         Point2D lookahead_point = {0, 0}; // 최종 목표 지점 좌표 (x, y)
@@ -656,7 +575,7 @@ void TruckController::compute_control()
         }
 
 
-        double raw_steer = std::atan(wheel_base_ * kappa); // 라디안
+        double raw_steer = std::atan(WHEEL_BASE_ * kappa); // 라디안
 
         // 조향각 스무딩
         // ... (now_steer 계산 로직 - 이전 답변 참고) ...
@@ -669,73 +588,276 @@ void TruckController::compute_control()
         // ... (steer_msg, vel_msg 발행 로직 - 이전 답변 참고) ...
         std_msgs::msg::Float32 steer_msg;
         steer_msg.data = static_cast<float>(now_steer * -30); /* <<< 부호 확인! */
-        // 속도 제어 로직
-        // 조향각 기반 기본 속도
-        //double target_velocity = calculate_target_velocity(steer_msg.data);
-
-        double distance_to_leader = get_distance_to_leader();
-
-        double throttle_value = calculate_platoon_velocity( formation_id_, 
-                                                            distance_to_leader,
-                                                            current_velocity_, 
-                                                            steer_msg.data );
-        // double TruckController::calculate_platoon_velocity(
-        //                                             double current_fid_, 
-        //                                             double distance_to_leader_,
-        //                                             double current_velocity_,
-        //                                             double current_steering_) 
-
-        std::stringstream ss;
-        ss<<"formation_id_ : "<<formation_id_;
-        std::cout<<ss.str()<<std::endl;
-
-        std::stringstream sss;
-        sss<<"Current Waypoint Num : "<<  current_wp_idx_;
-        std::cout<<sss.str()<<std::endl;
-
-        std::stringstream ssss;
-        ssss<<"distance_to_leader : "<<distance_to_leader;
-        std::cout<<ssss.str()<<std::endl;
+        //steer_msg.data = static_cast<float>(now_steer * -0.7);
+        if(deadband_flag_ == true)
+        {
+            if(steer_msg.data < 0.05 && steer_msg.data > -0.05)  steer_msg.data = 0.00;
+        }
+        else
+        {
+            if(steer_msg.data < 0.02 && steer_msg.data > -0.02)  steer_msg.data = 0.00;
+        }
+  
 
 
-        pub_steer_->publish(steer_msg);
+
+        if(lane_change_flag_ == false)
+        {
+            //basic control
+            //std::cout<<"basic control"<<std::endl;
+            distance_to_leader = get_distance_to_leader();
+            throttle_value = calculate_platoon_velocity( formation_id_, 
+                                                                distance_to_leader,
+                                                                current_velocity_, 
+                                                                steer_msg.data );
+            // if(formation_id_ == 1)
+            // {
+            //     std::cout<<"actor_id_ : "<<actor_id_<<std::endl;
+            //     std::cout<<"current_wp_idx_ : "<<current_wp_idx_<<std::endl;
+            //     std::cout<<"lane_change_flag_ : "<<lane_change_flag_<<std::endl;
+            // }
+
+        }
+        else
+        {
+            //std::cout<<"lane change control"<<std::endl;
+            //lane change control ~ front first
+            if(formation_id_ == 0)
+            {
+                
+                
+                if(start_lane_change_flag_ == true)
+                { 
+                   // std::cout<<"start lane change"<<std::endl;
+                    //웨이 포인트 200개 동안 차선변경 + 정착
+                    lane_number_=1;
+                    waypoints_=_waypoints_1;
+                    start_lane_change_flag_=false;
+                    start_lane_change_idx_=current_wp_idx_;
+                    // lane 변경 + 감속 플래그 on
+                    doing_lane_change_flag_=true; 
 
 
-        // // 군집 주행 속도 계산 및 적용
-        // if (formation_id_ > 0) {
-        //     double platoon_velocity = calculate_platoon_velocity();
-        //     // 급격한 속도 변화 방지를 위한 보간
-        //     double alpha = 0.7;  // 보간 계수 (0.0~1.0)
-        //     target_velocity = (alpha * platoon_velocity) + ((1.0 - alpha) * target_velocity);
-        // }
+                }
+                if((current_wp_idx_ - start_lane_change_idx_ > 200) && overrun_lane_change_flag_ == false 
+                                                                    && (doing_lane_change_flag_ == true ||decrease_speed_flag_ == true))
+                {
+                    
+                   // std::cout<<"decrease speed : "<<start_lane_change_flag_<<std::endl;
+                    // 레인 1번 진행중 중 -> 감속
+                    doing_lane_change_flag_=false;
+                    decrease_speed_flag_=true;
+                    check_overrun();
+                    
+                }
+                if(overrun_lane_change_flag_ == true)
+                {
+                    //std::cout<<"overrun"<<std::endl;
+                    // 2번 차량이 넘어선 경우 -> 정상 속도 + 차선변경 *overrun 플래그는 직접계산
+                    overrun_lane_change_flag_=false;
+                    decrease_speed_flag_=false;
+                    lane_number_=0;
+                    waypoints_=_waypoints_0;
+                    overrun_lane_change_idx_ = current_wp_idx_;
+
+                    doing_lane_change_flag_=true;
+                    start_lane_change_idx_ = 999999;
+                }
+                if((current_wp_idx_ - overrun_lane_change_idx_ > 200) && lane_number_== 0 &&doing_lane_change_flag_ == true)
+                {
+                    
+                    std::cout<<"lane change end"<<std::endl;
+                    // 차선 변경 및 정착 -> lane_change 종료 
+                    doing_lane_change_flag_=false;
+
+                    lane_change_flag_=false;
+                    start_lane_change_flag_ = true;
+                    update_formation_id(); //fid 변경은 한번에 진행
+                    std_msgs::msg::Bool lane_change_end_flag;
+                    lane_change_end_flag.data = true;
+                    pub_lane_change_end_flag_->publish(lane_change_end_flag);
+
+                    overrun_lane_change_idx_ = 999999;
+                    formation_change_end_flag_=false;
+
+
+                    
+                }
+
+
+
+                //제어부
+
+
+                if(start_lane_change_flag_ == true && lane_number_ == 1)
+                {
+                    //std::cout<<"doing_lane_change_flag_ 1: "<<doing_lane_change_flag_<<std::endl;
+                    //웨이포인트 200개 동안 차선변경 + 정착 중에 종방향제어
+                    distance_to_leader =  std::numeric_limits<double>::infinity(); //fid 0 은 상관 무
+                    throttle_value =  1;
+
+                }
+                
+                
+                if(doing_lane_change_flag_ == true)
+                {
+                    //std::cout<<"doing_lane_change_flag_ 2: "<<doing_lane_change_flag_<<std::endl;
+                    //웨이포인트 200개 동안 차선변경 + 정착 중에 종방향제어
+                    distance_to_leader =  std::numeric_limits<double>::infinity(); //fid 0 은 상관 무
+                    throttle_value =  -0.1;
+                    if(lane_number_ == 0)
+                    {
+                        throttle_value = 1;
+                    }
+
+                    
+                }
+
+                if(decrease_speed_flag_ == true)
+                {
+                    //std::cout<<"decrease_speed_flag_ : "<<decrease_speed_flag_<<std::endl;
+                    // 레인 1번 진행중 중  -> 감속  종방향제어
+                    distance_to_leader = std::numeric_limits<double>::infinity(); //fid 0 은 상관 무
+                    throttle_value =  calculate_platoon_velocity( formation_id_, 
+                                                                            distance_to_leader,
+                                                                            current_velocity_ * 1.6,
+                                                                            steer_msg.data );
+                }
+
+
+                if(overrun_lane_change_flag_ == true)
+                {
+                    //std::cout<<"overrun_lane_change_flag_ : "<<overrun_lane_change_flag_<<std::endl;
+                    // 2번 차량이 넘어선 경우 -> 정상 속도
+                    distance_to_leader = std::numeric_limits<double>::infinity(); //fid 0 은 상관 무
+                    // throttle_value =  calculate_platoon_velocity( formation_id_, 
+                    //                                                     distance_to_leader,
+                    //                                                     current_velocity_, 
+                    //                                                     steer_msg.data );
+                    throttle_value = 1;
+                }
+                if(overrun_lane_change_flag_ == false && lane_change_flag_==false)
+                {
+
+                    // 2번 차량이 넘어선 경우 -> 정상 속도 -> 정상궤도용
+                    distance_to_leader = std::numeric_limits<double>::infinity(); //fid 0 은 상관 무
+                    throttle_value =  calculate_platoon_velocity( formation_id_, 
+                                                                        distance_to_leader,
+                                                                        current_velocity_, 
+                                                                        steer_msg.data );
+
+                }
+                
+
+            }
+            else if(formation_id_ == 1)
+            {
+            
+                // 1번은 0번인 것처럼 주행
+                distance_to_leader = get_distance_to_leader(); 
+                throttle_value =  calculate_platoon_velocity( formation_id_ - 1, 
+                                                                    distance_to_leader,
+                                                                    current_velocity_*1.2, 
+                                                                    steer_msg.data );
+
+                //lane_change_flag_ 를 바꾸어 주는 코드 
+                if(formation_change_end_flag_==true)
+                {
+                    //차선변경 끝났다는 뜻 -> check_overrrun 실행
+
+                        // 차선 변경 및 정착 -> lane_change 종료 
+                        lane_change_flag_=false;
+                        //fid 변경 코드 
+                        update_formation_id();
+                        formation_change_end_flag_=false;
+
+                }
+
+
+            }
+            else if(formation_id_ == 2)
+            {
+
+
+                // 2번은 1번인 것처럼 주행
+                distance_to_leader = get_distance_to_leader(); 
+                throttle_value = calculate_platoon_velocity( formation_id_ , 
+                                                                    distance_to_leader*1.5,
+                                                                    current_velocity_, 
+                                                                    steer_msg.data );
+
+                //lane_change_flag_ 를 바꾸어 주는 코드 
+                if(formation_change_end_flag_==true)
+                {
+                    //차선변경 끝났다는 뜻 -> check_overrrun 실행
+
+                        // 차선 변경 및 정착 -> lane_change 종료 
+                        lane_change_flag_=false;
+                        //fid 변경 코드 
+                        update_formation_id();
+                        formation_change_end_flag_=false;
+                        //std::cout<<"get formation_change_end_flag_ : "<<formation_change_end_flag_<<std::endl;
+  
+                    
+                }
+
+
+            }
+
+
+
+        }
+
+
+        //publish control
+        if(actor_id_ == 0)
+        {
+            // std::stringstream ss;
+            // ss<<"formation_id_ : "<<formation_id_;
+            // std::cout<<ss.str()<<std::endl;
+
+            // std::stringstream sss;
+            // sss<<"Current Waypoint Num : "<<  current_wp_idx_;
+            // std::cout<<sss.str()<<std::endl;
+
+            // std::stringstream ssssss;
+            // if(deadband_flag_ == true) ssssss<<"Straight_mission";
+            // else ssssss<<"Curve_mission";
+            // std::cout<<ssssss.str()<<std::endl;
+
+            // std::stringstream ssss;
+            // ssss<<"distance_to_leader : "<<distance_to_leader;
+            // std::cout<<ssss.str()<<std::endl;
+
+            // std::stringstream sssss;
+            // sssss<<"steering : "<<steer_msg.data;
+            // std::cout<<sssss.str()<<std::endl;
+
+            // std::stringstream sssssss;
+            // sssssss<<"throttle : "<<throttle_value;
+            // std::cout<<sssssss.str()<<std::endl;
+            //std::cout<<"formation_change_count_ : "<<formation_change_count_<<std::endl;
+        }
         
-        
-        // 가속도 제한 적용
-        //target_velocity = apply_acceleration_limits(target_velocity);
 
-        
-        // throttle_value 명령 발행
-        std_msgs::msg::Float64 vel_msg;
-        vel_msg.data = throttle_value ;
-        pub_vel_->publish(vel_msg);
+            pub_steer_->publish(steer_msg);
 
-        // Odometry 발행 및 로깅
-        publish_odom(cur_x_, cur_y_, cur_z_, heading);
+            // throttle_value 명령 발행
+            std_msgs::msg::Float64 vel_msg;
+            vel_msg.data = throttle_value ;
+            pub_vel_->publish(vel_msg);
+
+            // Odometry 발행 및 로깅
+            publish_odom(cur_x_, cur_y_, cur_z_, heading);
 
 
-        // 다음 계산을 위해 현재 속도 저장
-        //prev_velocity_ = target_velocity;
-
-
-        
-        
     }
      // RUNNING 상태 끝
-
-    std::stringstream ss;
-    ss<<"-------------------------------------------------------------------------";
-    std::cout<<ss.str()<<std::endl;
-
+    if(formation_id_ == 0){
+        // std::stringstream ss;
+        // ss<<"-------------------------------------------------------------------------";
+        // std::cout<<ss.str()<<std::endl;
+    }
 } // compute_control 끝
 
 void TruckController::load_waypoints_0(const std::string &csv_path)
@@ -776,7 +898,7 @@ void TruckController::load_waypoints_1(const std::string &csv_path)
     std::ifstream ifs(csv_path+"1.csv");
     if (!ifs.is_open()) 
     {
-        //RCLCPP_ERROR(this->get_logger(), "Failed to open waypoint file: %s", csv_path.c_str());
+        
         rclcpp::shutdown(); // 또는 다른 오류 처리 로직
         return;
     }
@@ -800,7 +922,7 @@ void TruckController::load_waypoints_1(const std::string &csv_path)
         } 
         else 
         {
-            //RCLCPP_WARN(this->get_logger(), "Failed to parse waypoint line %d: %s", line_count, line.c_str());
+            
         }
     }
 }
@@ -901,19 +1023,27 @@ void TruckController::truck2_pos_callback(const geometry_msgs::msg::Point::Share
 
 // 현재 포메이션 기준 선행 차량과의 거리 계산
 double TruckController::get_distance_to_leader() {
-    if (formation_id_ <= 0) {
+    if (formation_id_ == 0) {
         return std::numeric_limits<double>::infinity();  // 선두 차량은 무한대 거리 반환
     }
 
     // 선행 차량의 actor_id 찾기 (formation_id가 1 작은 차량)
-    int leader_formation_id = calculate_leader_truck_number();
+    int leader_formation_id_actor_id = ( formation_id_ + 2 + formation_change_count_ ) % 3;
+    
+    // 유효하지 않은 leader_formation_id 체크
+    if (leader_formation_id_actor_id < 0 || leader_formation_id_actor_id >= 3) {
+        std::stringstream ss;
+        ss<<"invalid leader_formation_id_actor_id: " << leader_formation_id_actor_id;
+        std::cout<<ss.str()<<std::endl;
+        return std::numeric_limits<double>::infinity();
+    }
 
-    if (!std::isnan(truck_positions_[leader_formation_id].x) && !std::isnan(truck_positions_[leader_formation_id].y))
+    if (!std::isnan(truck_positions_[leader_formation_id_actor_id].x) && !std::isnan(truck_positions_[leader_formation_id_actor_id].y))
     {
-        const auto& leader_pos = truck_positions_[leader_formation_id];
+        const auto& leader_pos = truck_positions_[leader_formation_id_actor_id];
         
-        double dx = truck_positions_[leader_formation_id].x - cur_x_;
-        double dy = truck_positions_[leader_formation_id].y - cur_y_;
+        double dx = truck_positions_[leader_formation_id_actor_id].x - cur_x_;
+        double dy = truck_positions_[leader_formation_id_actor_id].y - cur_y_;
 
         double distance_from_sensor = std::sqrt(dx*dx + dy*dy);
         double distance_to_leader = distance_from_sensor - TRUCK_LENGTH;
@@ -932,97 +1062,115 @@ void TruckController::current_velocity_callback(const std_msgs::msg::Float32::Sh
     current_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
 }
 
-// double TruckController::calculate_acceleration_command(double target_velocity, double current_velocity)
-// {
-//     const double dt = 0.02;  // 제어 주기 (50Hz 가정)
-    
-//     double velocity_error = target_velocity - current_velocity;
-    
-//     integral_velocity_error_ += velocity_error * dt;
-//     const double integral_limit = 1.0;
-//     integral_velocity_error_ = std::clamp(integral_velocity_error_, -integral_limit, integral_limit);
-    
-//     double derivative_error = (velocity_error - prev_velocity_error_) / dt;
-//     prev_velocity_error_ = velocity_error;
-    
-//     double control_output = 
-//         kp_velocity_ * velocity_error +
-//         ki_velocity_ * integral_velocity_error_ +
-//         kd_velocity_ * derivative_error;
-    
-//     // 제어 출력을 throttle/brake 명령으로 변환 (-1.0: full brake, 1.0: full throttle)
-//     return std::clamp(control_output, -1.0, 1.0);
-// }
 
-// 1. FID 업데이트 함수
-// void TruckController::update_current_fid() {
-//     current_fid_ = calculate_formation_id();  // 기존 함수 활용
-// }
 
 // 2. FID와 거리에 따른 기준 속도 계산 (km/h)
 double TruckController::get_reference_velocity(int fid, double distance_to_leader) {
     if (fid == 0) {
-        std::stringstream ss;
-        ss<<"leader speed";
-        std::cout<<ss.str()<<std::endl;
-        return STABLE_SPEED;  // 선두차량은 70km/h
+        // std::stringstream ss;
+        // ss<<"leader speed";
+        // std::cout<<ss.str()<<std::endl;
+        return STABLE_SPEED_;  
     } 
-    // FID 1,2인 경우 (후미 차량)
+    
+    // FID 1,2인 경우 (후미 차량)만 거리 기반 제어
+    // 하지만 distance_to_leader가 유효하지 않으면 안전하게 STABLE_SPEED 반환
+    if (std::isinf(distance_to_leader) || std::isnan(distance_to_leader)) {
+        // std::stringstream ss;
+        // ss<<"invalid distance, using stable speed";
+        // std::cout<<ss.str()<<std::endl;
+        return STABLE_SPEED_;
+    }
     
     if(distance_to_leader < emergency_gap_) 
     {   
-        std::stringstream ss;
-        ss<<"emergency stop";
-        std::cout<<ss.str()<<std::endl;
+        // std::stringstream ss;
+        // ss<<"emergency stop";
+        // std::cout<<ss.str()<<std::endl;
         return -100.0;
     }
 
-
-   
     if (distance_to_leader < min_gap_) 
     {
-
-        std::stringstream ss;
-        ss<<"slow down";
-        std::cout<<ss.str()<<std::endl;
-
-        return SLOW_SPEED;  // 최소 간격보다 가까우면 30km/h
+        // std::stringstream ss;
+        // ss<<"slow down";
+        // std::cout<<ss.str()<<std::endl;
+        return SLOW_SPEED_;  
     } 
-    else if (distance_to_leader < desired_gap_)
+    else if (distance_to_leader < desired_gap_)  //min_gap이상 desired_gap이하 ex) 20~30
     {
-        std::stringstream ss;
-        ss<<"stable speed";
-        std::cout<<ss.str()<<std::endl;
-        return STABLE_SPEED;  // 희망 간격 이내면 70km/h
+        // std::stringstream ss;
+        // ss<<"stable speed";
+        // std::cout<<ss.str()<<std::endl;
+        return STABLE_SPEED_;  
     } 
-    else 
+    else //desired_gap이상  부스트업
     {   
-        std::stringstream ss;
-        ss<<"accelerate";
-        std::cout<<ss.str()<<std::endl;
-        return ACC_SPEED;  // 희망 간격보다 멀면 100km/h
+        // std::stringstream ss;
+        // ss<<"accelerate";
+        // std::cout<<ss.str()<<std::endl;
+        return ACC_SPEED_;  
     }
 }
 
 // 3. 조향각에 따른 속도 감소
 double TruckController::adjust_velocity_for_steering(double base_velocity, double steering) {
     double abs_steering = std::abs(steering);
-    if(base_velocity < -10.0) return -100.0;
     
-    if (abs_steering >= 0.06) {
-        return base_velocity / 2.0;  // 조향각 0.06 이상
-    } else if (abs_steering >= 0.04) {
-        return base_velocity / 1.0;  // 조향각 0.04 이상
+    // emergency stop 신호인 경우 그대로 유지 (범위 확인으로 정밀도 문제 해결)
+    if(base_velocity < -50.0) {
+        if(formation_id_ == 0)
+        {
+            std::cout<<"is leader emer? at adjust_velocity_for_steering"<<std::endl;
+        }
+        return -100.0;
     }
-    
-    return base_velocity;  // 조향각 작은 경우 원래 속도
+    if(deadband_flag_ == true)
+    {
+        return base_velocity;
+    }
+    else
+    {   
+        if(abs_steering >= 0.15)
+        {
+            return base_velocity * 0.7;
+        }
+        else if(abs_steering >= 0.10)
+        {
+            return base_velocity * 0.8;
+        }
+        else if(abs_steering >= 0.05)
+        {
+            return base_velocity * 0.9;
+        }
+        else
+        {
+            return base_velocity;
+        }
+    }
+
+     
+     
+ 
+     // if (abs_steering >= 0.06) {
+     //     return base_velocity * 0.5;  // 조향각 0.06 이상
+     // } else if (abs_steering >= 0.04) {
+     //     return base_velocity * 0.7;  // 조향각 0.04 이상
+     // }
+     
+     return base_velocity;  // 조향각 작은 경우 원래 속도
 }
 
 // 4. PID 제어
 double TruckController::calculate_pid_output(double current_vel, double target_vel,
                                            double kp, double ki, double kd) {
 
-    if(target_vel < -10.0) return -100.0;
+    // emergency stop 신호인 경우 그대로 유지 (범위 확인으로 정밀도 문제 해결)
+    if(target_vel < -50.0) {
+
+        
+        return -100.0;
+    }
 
     double error = target_vel - current_vel;
     integral_ += error * dt_;
@@ -1036,36 +1184,36 @@ double TruckController::calculate_pid_output(double current_vel, double target_v
     
     // PID 출력 계산
     double output = kp * error + ki * integral_ + kd * derivative;
-    
+    if(output > 10.0) output = 10.0;
+    if(output < -10.0) output = -10.0;
 
     return output;
 }
 
 // 5. 제어값 정규화 (-1 ~ 1)
 double TruckController::normalize_control_output(double pid_output) {
-    if(pid_output < -10.0) return -100.0;
+    // emergency stop 신호인 경우 그대로 유지 (범위 확인으로 정밀도 문제 해결)
+    if(pid_output < -50.0){
+
+        
+        return -100.0;
+    
+    }
+    
     // -1.0 ~ 1.0 사이로 클리핑
-    
-    
     double clamped_output = std::clamp(pid_output, -1.0, 1.0);
-
-    // std::stringstream ss;
-    // ss << "pid_output: " << pid_output << " clamped_output: " << clamped_output ;
-    // std::cout<<ss.str()<<std::endl;
-
 
     return clamped_output;
 }
 
 // 메인 제어 함수 (기존 함수 수정)
 double TruckController::calculate_platoon_velocity(
-                                                    double current_fid_, 
+                                                    int current_fid_, 
                                                     double distance_to_leader_,
                                                     double current_velocity_,
                                                     double current_steering_) 
     {
-    // 1. FID 업데이트
-    //update_current_fid();
+
     
     // 2. 기준 속도 계산
     double ref_velocity = get_reference_velocity(current_fid_, distance_to_leader_);
@@ -1077,7 +1225,7 @@ double TruckController::calculate_platoon_velocity(
     double pid_output = calculate_pid_output(
         current_velocity_,
         adjusted_velocity,
-        0.3,    // kp
+        1.0,    // kp
         0.1,    // ki
         0.2     // kd
     );
@@ -1086,12 +1234,81 @@ double TruckController::calculate_platoon_velocity(
     double throttle = normalize_control_output(pid_output);
     
     // 5. 로깅
-    std::stringstream ss;
-    ss<< "Current velocity (km/h): " << current_velocity_ 
-              << ", Target velocity (km/h): " << adjusted_velocity << std::endl<<"throttle: "<<throttle<<std::endl<<"lane_number: "<<lane_number_;
-    std::cout<<ss.str()<<std::endl;
-
+    // if(formation_id_ == 0 && lane_change_flag_ == false)
+    // {
+    //     std::stringstream ss;
+    //     ss<< "Current velocity (km/h): " << current_velocity_ 
+    //             << ", Target velocity (km/h): " << adjusted_velocity << std::endl<<"throttle: "<<throttle<<std::endl<<"lane_number: "<<lane_number_;
+    //     std::cout<<ss.str()<<std::endl;
+    // }
     
     return throttle;
 }
 
+void TruckController::check_mission_state_(int cur_idx_)
+{
+    if(cur_idx_ > Curve_idx_1.start_idx && cur_idx_ < Curve_idx_1.finish_idx-300)
+    {
+        lookahead_dist_ = curve_lookahead_dist_;
+        deadband_flag_ = false;
+    }
+    else if(cur_idx_ > Curve_idx_2.start_idx+300 && cur_idx_ < Curve_idx_2.finish_idx-300)
+    {
+        lookahead_dist_ = curve_lookahead_dist_;
+        deadband_flag_ = false;
+    }
+    else if(cur_idx_ > Curve_idx_3.start_idx+300 && cur_idx_ < Curve_idx_3.finish_idx-300)
+    {
+        lookahead_dist_ = curve_lookahead_dist_;
+        deadband_flag_ = false;
+    }
+    else if(cur_idx_ > Curve_idx_4.start_idx+300 && cur_idx_ < Curve_idx_4.finish_idx-300)
+    {   
+        lookahead_dist_ = curve_lookahead_dist_;
+        deadband_flag_ = false;
+    }
+    else
+    {
+        //straigt zone
+        deadband_flag_ = true;
+        lookahead_dist_ = straight_lookahead_dist_;
+    }
+
+
+}
+
+
+void TruckController::check_overrun()
+{
+
+    int leader_formation_id = (1+ formation_change_count_) % 3;
+    int front_first_id = (0+ formation_change_count_) % 3;
+
+    double distance_overrun = 0;
+    if (!std::isnan(truck_positions_[leader_formation_id].x) && !std::isnan(truck_positions_[leader_formation_id].y))
+    {
+        const auto& leader_pos = truck_positions_[leader_formation_id];
+        
+        double dx = truck_positions_[leader_formation_id].x - truck_positions_[front_first_id].x;
+        double dy = truck_positions_[leader_formation_id].y - truck_positions_[front_first_id].y;
+
+        double distance_from_sensor = std::sqrt(dx*dx + dy*dy);
+        distance_overrun = distance_from_sensor - TRUCK_LENGTH;
+
+        //std::cout<<"distance_overrun : "<<distance_overrun<<std::endl;
+    }
+    if(formation_id_ == 0)
+    {
+        //std::cout<<"distance_overrun : "<<distance_overrun<<std::endl;
+    }
+    if(distance_overrun > desired_gap_   + TRUCK_LENGTH   )
+    {
+        //std::cout<<"overrun computed"<<std::endl;
+        overrun_lane_change_flag_=true;
+    }
+    else
+    {
+        overrun_lane_change_flag_=false;
+    }
+
+}

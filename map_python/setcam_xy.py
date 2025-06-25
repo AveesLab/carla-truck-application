@@ -2,10 +2,11 @@ import carla
 
 def move_camera_to(x, y, z, yaw_deg=0.0, pitch_deg=-45.0):
     client = carla.Client('localhost', 2000)
-    client.set_timeout(5.0)
+    client.set_timeout(30.0)
     #world = client.get_world()
     #world = client.load_world("Town06")
-    world = client.load_world("ihp_sce")
+    world = client.load_world("mid_large_cycle")
+    
     
     spectator = world.get_spectator()
 
@@ -19,5 +20,5 @@ def move_camera_to(x, y, z, yaw_deg=0.0, pitch_deg=-45.0):
 
 if __name__ == '__main__':
     # 예: (100, 50, 30) 좌표로 이동
-    move_camera_to(x=62707.25, y=-17052.626953125 , z=1, yaw_deg=90.0)
+    move_camera_to(x=18980, y=19509 , z=4, yaw_deg=90.0)
 

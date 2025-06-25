@@ -3,7 +3,7 @@ import sys
 def move_camera_to_waypoint(csv_path, index):
     # CARLA 클라이언트 연결
     client = carla.Client('localhost', 2000)
-    client.set_timeout(5.0)
+    client.set_timeout(50.0)
     world = client.get_world()
 
     # CSV 파일에서 waypoint 로딩
