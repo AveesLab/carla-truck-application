@@ -125,7 +125,7 @@ private:
     bool doing_lane_change_flag_ = false;
     bool overrun_lane_change_flag_ = false;
     bool lane_change_flag_ = false;
-    bool decrease_speed_flag_ = false;
+    bool increase_speed_flag_ = false;
     int start_lane_change_idx_;     //차선변경 시작 웨이포인트 인덱스
     int overrun_lane_change_idx_;       //overrun 차량 웨이포인트 인덱스
 
