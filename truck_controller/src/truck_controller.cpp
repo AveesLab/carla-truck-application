@@ -270,7 +270,7 @@ void TruckController::compute_control()
             // --- 직진 명령 발행 ---
             RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                                 "Driving straight for heading init (%.2f / %.2f m). Publishing vel=%.2f, steer=0.0",
-                                 dist_from_start, init_dist_, 3.0);
+                                 dist_from_start, init_dist_, 1.0);
 
             std_msgs::msg::Float32 steer_msg;
             steer_msg.data = 0.0f;
@@ -457,17 +457,17 @@ void TruckController::compute_control()
         {
  
             if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
-            if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
-            if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
-            if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
-            if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
-            if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
-            if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
-            if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
-            if(current_wp_idx_ > 16700 && current_wp_idx_<16800) lane_change_flag_=true;
-            if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
-            if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
-            if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
+            // if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
+            // if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
+            // if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
+            // if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
+            // if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
+            // if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
+            // if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
+            // if(current_wp_idx_ > 16700 && current_wp_idx_<16800) lane_change_flag_=true;
+            // if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
+            // if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
+            // if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
         }
 
 

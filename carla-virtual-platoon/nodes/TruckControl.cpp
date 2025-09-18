@@ -18,6 +18,7 @@ TruckControl::TruckControl(boost::shared_ptr<carla::client::Vehicle> vehicle_, i
     
     this->trucknum = num; 
     this->control.hand_brake = false;
+    this->control.manual_gear_shift = false;
     Vehicle_->ApplyControl(control);
 }
 
@@ -45,6 +46,8 @@ void TruckControl::VelocitySubCallback(const std_msgs::msg::Float64::SharedPtr m
         this->control.throttle = control_value;
         this->control.brake = 0;
         this->control.hand_brake = false;
+        this->control.manual_gear_shift = false;
+
     }
     else if (control_value < 0) {
         this->control.throttle = 0;
