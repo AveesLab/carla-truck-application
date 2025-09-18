@@ -64,5 +64,6 @@
         "typeinfo": "cpp",
         "variant": "cpp",
         "bit": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "/home/avees/ros2_ws/src/carla-virtual-platoon"
 }

@@ -27,7 +27,18 @@ def generate_nodes(context, *, num_trucks, map_name):
             name=f'bridge{i-1}',
             namespace=f'truck{i-1}',
             output='screen',
-            parameters=[ros_param_file,sync_param_file],
+            parameters=[
+                ros_param_file,
+                sync_param_file,
+                            {            
+                                'use_sim_time': True ,          
+                                'fixed_delta_seconds': 0.005,
+                                'max_substep_delta_time': 0.005,
+                                'max_substeps': 2,
+                                'synchronous_mode_wait_for_vehicle_control_command': True
+                                
+                            },
+                ],
             arguments=[
                 f'--truck_id={i-1}', 
                 f'--map={map_name}',

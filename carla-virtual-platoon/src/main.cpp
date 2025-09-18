@@ -40,8 +40,8 @@ carla::geom::Location GetTruckLocation(int truck_num, std::string map_name) {
     {
         if(abs(truckRotations[map_name][truck_num][1])>1.0f)
         {
-            x = truckLocations[map_name][truck_num][0]-5.0f;
-            y = truckLocations[map_name][truck_num][1];
+            x = truckLocations[map_name][truck_num][0]+5.0f;
+            y = truckLocations[map_name][truck_num][1]-0.5f;
             z = truckLocations[map_name][truck_num][2];
         }else
         {

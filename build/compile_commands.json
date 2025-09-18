@@ -1,0 +1,50 @@
+[
+{
+  "directory": "/home/avees/ros2_ws/src/build",
+  "command": "/usr/bin/clang++ -DDEFAULT_RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -DRCUTILS_ENABLE_FAULT_INJECTION -I/home/avees/carla/LibCarla/source -I/home/avees/ros2_ws/src -I/home/avees/carla/PythonAPI/carla/dependencies/include -I/home/avees/carla/PythonAPI/carla/dependencies/include/system -I/home/avees/ros2_ws/src/carla-virtual-platoon/include -isystem /home/avees/ros2_ws/install/ros2_msg/include -isystem /opt/ros/galactic/include -isystem /usr/include/opencv4 -g -std=gnu++17 -Wall -Wextra -Wl,-Bstatic -lrpc -lboost_filesystem -Wl,-Bdynamic -lpng -ltiff -ljpeg -lRecast -lDetour -lDetourCrowd -o CMakeFiles/main.dir/src/main.cpp.o -c /home/avees/ros2_ws/src/carla-virtual-platoon/src/main.cpp",
+  "file": "/home/avees/ros2_ws/src/carla-virtual-platoon/src/main.cpp",
+  "output": "CMakeFiles/main.dir/src/main.cpp.o"
+},
+{
+  "directory": "/home/avees/ros2_ws/src/build",
+  "command": "/usr/bin/clang++ -DDEFAULT_RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -DRCUTILS_ENABLE_FAULT_INJECTION -I/home/avees/carla/LibCarla/source -I/home/avees/ros2_ws/src -I/home/avees/carla/PythonAPI/carla/dependencies/include -I/home/avees/carla/PythonAPI/carla/dependencies/include/system -I/home/avees/ros2_ws/src/carla-virtual-platoon/include -isystem /home/avees/ros2_ws/install/ros2_msg/include -isystem /opt/ros/galactic/include -isystem /usr/include/opencv4 -g -std=gnu++17 -Wall -Wextra -Wl,-Bstatic -lrpc -lboost_filesystem -Wl,-Bdynamic -lpng -ltiff -ljpeg -lRecast -lDetour -lDetourCrowd -o CMakeFiles/main.dir/nodes/Spectator.cpp.o -c /home/avees/ros2_ws/src/carla-virtual-platoon/nodes/Spectator.cpp",
+  "file": "/home/avees/ros2_ws/src/carla-virtual-platoon/nodes/Spectator.cpp",
+  "output": "CMakeFiles/main.dir/nodes/Spectator.cpp.o"
+},
+{
+  "directory": "/home/avees/ros2_ws/src/build",
+  "command": "/usr/bin/clang++ -DDEFAULT_RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -DRCUTILS_ENABLE_FAULT_INJECTION -I/home/avees/carla/LibCarla/source -I/home/avees/ros2_ws/src -I/home/avees/carla/PythonAPI/carla/dependencies/include -I/home/avees/carla/PythonAPI/carla/dependencies/include/system -I/home/avees/ros2_ws/src/carla-virtual-platoon/include -isystem /home/avees/ros2_ws/install/ros2_msg/include -isystem /opt/ros/galactic/include -isystem /usr/include/opencv4 -g -std=gnu++17 -Wall -Wextra -Wl,-Bstatic -lrpc -lboost_filesystem -Wl,-Bdynamic -lpng -ltiff -ljpeg -lRecast -lDetour -lDetourCrowd -o CMakeFiles/main.dir/nodes/Camera.cpp.o -c /home/avees/ros2_ws/src/carla-virtual-platoon/nodes/Camera.cpp",
+  "file": "/home/avees/ros2_ws/src/carla-virtual-platoon/nodes/Camera.cpp",
+  "output": "CMakeFiles/main.dir/nodes/Camera.cpp.o"
+},
+{
+  "directory": "/home/avees/ros2_ws/src/build",
+  "command": "/usr/bin/clang++ -DDEFAULT_RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -DRCUTILS_ENABLE_FAULT_INJECTION -I/home/avees/carla/LibCarla/source -I/home/avees/ros2_ws/src -I/home/avees/carla/PythonAPI/carla/dependencies/include -I/home/avees/carla/PythonAPI/carla/dependencies/include/system -I/home/avees/ros2_ws/src/carla-virtual-platoon/include -isystem /home/avees/ros2_ws/install/ros2_msg/include -isystem /opt/ros/galactic/include -isystem /usr/include/opencv4 -g -std=gnu++17 -Wall -Wextra -Wl,-Bstatic -lrpc -lboost_filesystem -Wl,-Bdynamic -lpng -ltiff -ljpeg -lRecast -lDetour -lDetourCrowd -o CMakeFiles/main.dir/nodes/Radar.cpp.o -c /home/avees/ros2_ws/src/carla-virtual-platoon/nodes/Radar.cpp",
+  "file": "/home/avees/ros2_ws/src/carla-virtual-platoon/nodes/Radar.cpp",
+  "output": "CMakeFiles/main.dir/nodes/Radar.cpp.o"
+},
+{
+  "directory": "/home/avees/ros2_ws/src/build",
+  "command": "/usr/bin/clang++ -DDEFAULT_RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -DRCUTILS_ENABLE_FAULT_INJECTION -I/home/avees/carla/LibCarla/source -I/home/avees/ros2_ws/src -I/home/avees/carla/PythonAPI/carla/dependencies/include -I/home/avees/carla/PythonAPI/carla/dependencies/include/system -I/home/avees/ros2_ws/src/carla-virtual-platoon/include -isystem /home/avees/ros2_ws/install/ros2_msg/include -isystem /opt/ros/galactic/include -isystem /usr/include/opencv4 -g -std=gnu++17 -Wall -Wextra -Wl,-Bstatic -lrpc -lboost_filesystem -Wl,-Bdynamic -lpng -ltiff -ljpeg -lRecast -lDetour -lDetourCrowd -o CMakeFiles/main.dir/nodes/Lidar.cpp.o -c /home/avees/ros2_ws/src/carla-virtual-platoon/nodes/Lidar.cpp",
+  "file": "/home/avees/ros2_ws/src/carla-virtual-platoon/nodes/Lidar.cpp",
+  "output": "CMakeFiles/main.dir/nodes/Lidar.cpp.o"
+},
+{
+  "directory": "/home/avees/ros2_ws/src/build",
+  "command": "/usr/bin/clang++ -DDEFAULT_RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -DRCUTILS_ENABLE_FAULT_INJECTION -I/home/avees/carla/LibCarla/source -I/home/avees/ros2_ws/src -I/home/avees/carla/PythonAPI/carla/dependencies/include -I/home/avees/carla/PythonAPI/carla/dependencies/include/system -I/home/avees/ros2_ws/src/carla-virtual-platoon/include -isystem /home/avees/ros2_ws/install/ros2_msg/include -isystem /opt/ros/galactic/include -isystem /usr/include/opencv4 -g -std=gnu++17 -Wall -Wextra -Wl,-Bstatic -lrpc -lboost_filesystem -Wl,-Bdynamic -lpng -ltiff -ljpeg -lRecast -lDetour -lDetourCrowd -o CMakeFiles/main.dir/nodes/TruckControl.cpp.o -c /home/avees/ros2_ws/src/carla-virtual-platoon/nodes/TruckControl.cpp",
+  "file": "/home/avees/ros2_ws/src/carla-virtual-platoon/nodes/TruckControl.cpp",
+  "output": "CMakeFiles/main.dir/nodes/TruckControl.cpp.o"
+},
+{
+  "directory": "/home/avees/ros2_ws/src/build",
+  "command": "/usr/bin/clang++ -DDEFAULT_RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -DRCUTILS_ENABLE_FAULT_INJECTION -I/home/avees/carla/LibCarla/source -I/home/avees/ros2_ws/src -I/home/avees/carla/PythonAPI/carla/dependencies/include -I/home/avees/carla/PythonAPI/carla/dependencies/include/system -I/home/avees/ros2_ws/src/carla-virtual-platoon/include -isystem /home/avees/ros2_ws/install/ros2_msg/include -isystem /opt/ros/galactic/include -isystem /usr/include/opencv4 -g -std=gnu++17 -Wall -Wextra -Wl,-Bstatic -lrpc -lboost_filesystem -Wl,-Bdynamic -lpng -ltiff -ljpeg -lRecast -lDetour -lDetourCrowd -o CMakeFiles/main.dir/nodes/TruckStatus.cpp.o -c /home/avees/ros2_ws/src/carla-virtual-platoon/nodes/TruckStatus.cpp",
+  "file": "/home/avees/ros2_ws/src/carla-virtual-platoon/nodes/TruckStatus.cpp",
+  "output": "CMakeFiles/main.dir/nodes/TruckStatus.cpp.o"
+},
+{
+  "directory": "/home/avees/ros2_ws/src/build",
+  "command": "/usr/bin/clang++ -DDEFAULT_RMW_IMPLEMENTATION=rmw_cyclonedds_cpp -DRCUTILS_ENABLE_FAULT_INJECTION -I/home/avees/carla/LibCarla/source -I/home/avees/ros2_ws/src -I/home/avees/carla/PythonAPI/carla/dependencies/include -I/home/avees/carla/PythonAPI/carla/dependencies/include/system -I/home/avees/ros2_ws/src/carla-virtual-platoon/include -isystem /home/avees/ros2_ws/install/ros2_msg/include -isystem /opt/ros/galactic/include -isystem /usr/include/opencv4 -g -std=gnu++17 -Wall -Wextra -Wl,-Bstatic -lrpc -lboost_filesystem -Wl,-Bdynamic -lpng -ltiff -ljpeg -lRecast -lDetour -lDetourCrowd -o CMakeFiles/main.dir/nodes/TruckOBU.cpp.o -c /home/avees/ros2_ws/src/carla-virtual-platoon/nodes/TruckOBU.cpp",
+  "file": "/home/avees/ros2_ws/src/carla-virtual-platoon/nodes/TruckOBU.cpp",
+  "output": "CMakeFiles/main.dir/nodes/TruckOBU.cpp.o"
+}
+]

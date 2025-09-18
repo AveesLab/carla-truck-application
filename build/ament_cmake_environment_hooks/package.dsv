@@ -1,0 +1,4 @@
+source;share/carla-virtual-platoon/local_setup.bash
+source;share/carla-virtual-platoon/local_setup.dsv
+source;share/carla-virtual-platoon/local_setup.sh
+source;share/carla-virtual-platoon/local_setup.zsh

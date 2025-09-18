@@ -131,5 +131,6 @@
   ros__parameters:
     add_sensor/spectator : true 
     add_sensor/radar_number : 0 
-    add_sensor/camera_number : 0 
+    add_sensor/camera_number : 1 
     add_sensor/lidar_number : 0 
+    

@@ -1,5 +1,3 @@
-
-
 import os
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
@@ -23,13 +21,15 @@ def generate_controllers(context):
             arguments=[str(i)],
             parameters=[{
               'csv_path':     csv,
-              'lookahead_dist': 10.0,
-              'max_speed':      0.3,
-              'wheel_base':      5.0,
-              'desired_gap':     10.0,
-              'min_gap':         5.0,
-              'time_gap':         2.0,
-              'max_accel':        2.0,
+              'curve_lookahead_dist': 5.0,
+              'straight_lookahead_dist': 7.0,
+              'ACC_SPEED':     60.0,
+              'SLOW_SPEED':      30.0,
+              'STABLE_SPEED':      50.0,   
+              'WHEEL_BASE':      16.0,
+              'DESIRED_GAP':      16.8,
+              'MIN_GAP':          14.0,
+              'EMERGENCY_GAP':      5.0,
 
  
             }]

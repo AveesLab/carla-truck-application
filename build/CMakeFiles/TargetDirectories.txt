@@ -1,0 +1,10 @@
+/home/avees/ros2_ws/src/build/CMakeFiles/uninstall.dir
+/home/avees/ros2_ws/src/build/CMakeFiles/carla-virtual-platoon_uninstall.dir
+/home/avees/ros2_ws/src/build/CMakeFiles/main.dir
+/home/avees/ros2_ws/src/build/CMakeFiles/test.dir
+/home/avees/ros2_ws/src/build/CMakeFiles/edit_cache.dir
+/home/avees/ros2_ws/src/build/CMakeFiles/rebuild_cache.dir
+/home/avees/ros2_ws/src/build/CMakeFiles/list_install_components.dir
+/home/avees/ros2_ws/src/build/CMakeFiles/install.dir
+/home/avees/ros2_ws/src/build/CMakeFiles/install/local.dir
+/home/avees/ros2_ws/src/build/CMakeFiles/install/strip.dir
