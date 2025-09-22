@@ -9,7 +9,7 @@ class CarlaWaypointVisualizer(Node):
         super().__init__('carla_waypoint_visualizer')
 
         # 경로 파일 경로
-        self.csv_path = '/home/avees/ros2_ws/src/truck_controller/data/1.csv'
+        self.csv_path = '/home/avees/ros2_ws/src/truck_controller/data/0.csv'
         
         # CARLA 클라이언트 연결
         self.client = carla.Client('localhost', 2000)
@@ -45,10 +45,13 @@ class CarlaWaypointVisualizer(Node):
         for i in range(len(self.waypoints) - 1):
             wp1 = self.waypoints[i].location
             wp2 = self.waypoints[i + 1].location
+            self.world.debug.draw_string(wp1, 'O', draw_shadow=False,
+            color=carla.Color(r=255, g=0, b=0), life_time=LT,
+            persistent_lines=True)
             # self.world.debug.draw_line(
             #     wp1, wp2,
             #     thickness=0.1,
-            #     color=color,
+            #     color=carla.Color(r=0, g=127, b=0),
             #     life_time=LT
             # )
 
@@ -57,10 +60,10 @@ class CarlaWaypointVisualizer(Node):
             #     color = carla.Color(0, 255, 0)  # Green
             # else:
             #     color = carla.Color(255, 0, 0)  # Red
-            if 0 <= i <= 500 :
-                self.world.debug.draw_string(self.waypoints[i].location, 'O', draw_shadow=False,
-                color=carla.Color(r=0,  g=255, b=255), life_time=LT,
-                persistent_lines=True)
+            # if 0 <= i <= 500 :
+            #     self.world.debug.draw_string(self.waypoints[i].location, 'O', draw_shadow=False,
+            #     color=carla.Color(r=0,  g=255, b=255), life_time=LT,
+            #     persistent_lines=True)
 
 
             # if 12200 <= i <= 12300 :

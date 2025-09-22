@@ -25,7 +25,7 @@ TruckController::TruckController(int argu_id)
   prev_error_(0.0),         // PID 이전 오차
   lane_number_(0)
 {
-
+  set_wp_number_ = 0; // wp 설정_4icra
   // Formation ID 설정  
   if(actor_id_ == 0) formation_id_ = 0;
   else if(actor_id_ == 1) formation_id_ = 1;
@@ -81,6 +81,7 @@ TruckController::TruckController(int argu_id)
   // 웨이포인트 로드 (이 함수는 waypoints_ 멤버 변수를 ENU 좌표로 채운다고 가정)
   load_waypoints_0(csv_path);
   load_waypoints_1(csv_path);
+  load_waypoints_2(csv_path);
   waypoints_ = _waypoints_0;
 
   // --- 초기 Yaw 설정 (경로 0->1 방향): 초기 직진 방향 가이드용 ---
@@ -391,8 +392,8 @@ void TruckController::compute_control()
                 current_wp_idx_ = (current_wp_idx_ + 100) % waypoints_.size();
                 iteration_count++;
                 continue;
-            } 
-
+            }
+            
             int window_pp = 10;
             int start_pp = std::max<int>(current_wp_idx_ - window_pp, 0); 
             int end_pp = std::min<int>(current_wp_idx_ + window_pp, (int)waypoints_.size() - 1);
@@ -425,12 +426,14 @@ void TruckController::compute_control()
 
                     // std::cout<<"actor "<< actor_id_<<" dist min "<<min_d2_pp<<" dist_threshhold "<<dist_threshold_<<std::endl;
                     // std::cout<<"near wp x: "<<waypoints_[nearest_idx_pp].x <<" y: "<<waypoints_[nearest_idx_pp].y<<std::endl;
+                    
                     current_wp_idx_ = nearest_idx_pp;
                     break;
                 }
             }
             iteration_count++;
         }
+        
         
 
         
@@ -450,27 +453,53 @@ void TruckController::compute_control()
                 if (dist < min_dist) {
                     min_dist = dist;
                     closest_idx = i;
+                    
                 }
             }
             current_wp_idx_ = closest_idx;
         }
-        
+
+
+        // if(actor_id_ == 1)
+        // {
+        //     double dx = waypoints_[current_wp_idx_].x - cur_x_;
+        //     double dy = waypoints_[current_wp_idx_].y - cur_y_;
+        //     double dist = dx * dx + dy * dy;
+        //     dist_to_wp_ = std::sqrt(dist);
+        //     //std::cout<<" dist to wp : "<<dist_to_wp_<<std::endl;
+        // }
+        int dist_to_wp_ =  current_wp_idx_ - start_lane_change_idx_ ;
         check_mission_state_(current_wp_idx_);
+        std::cout<<"set_wp_number_ : "<<set_wp_number_<<std::endl;
+        std::cout<<"dist_to_wp_ : "<<dist_to_wp_<<std::endl;
         //for lane_change flag test
         if(deadband_flag_ == false)
         {
-            if(current_wp_idx_ > 500 && current_wp_idx_<700) 
+            if(current_wp_idx_ > 450 && current_wp_idx_<700) 
             {
                 if(actor_id_ ==0){
                     stop_flag_=true;
                 }
             }
  
-            if(current_wp_idx_ > 400 && current_wp_idx_<600) 
+            if(current_wp_idx_ > 400 && current_wp_idx_<600 && set_wp_number_ !=2) 
             {
                 if(actor_id_ != 0){
                     lane_change_flag_=true;
                 }
+                set_wp_number_ = 2; 
+            }
+            
+
+            if(set_wp_number_ == 2 && dist_to_wp_ > 45 && lane_change_flag_==false)
+            {
+                //다시 lane - 1 추종
+                if(actor_id_ != 0){
+                    lane_change_flag_=true;
+                    start_lane_change_flag_=true;
+                }
+                set_wp_number_ = 1;
+                start_lane_change_idx_ = 9999;
             }
 
                 
@@ -631,8 +660,8 @@ void TruckController::compute_control()
                                                                 current_velocity_, 
                                                                 steer_msg.data );
 
-                std::cout<<"actor_id_ : "<<actor_id_<<std::endl;
-                std::cout<<"current_wp_idx_ : "<<current_wp_idx_<<std::endl;
+                // std::cout<<"actor_id_ : "<<actor_id_<<std::endl;
+                // std::cout<<"current_wp_idx_ : "<<current_wp_idx_<<std::endl;
 
 
 
@@ -649,10 +678,23 @@ void TruckController::compute_control()
                 { 
                    // std::cout<<"start lane change"<<std::endl;
                     //웨이 포인트 200개 동안 차선변경 + 정착
-                    lane_number_=1;
-                    waypoints_=_waypoints_1;
+                    lane_number_= set_wp_number_;
+                    if(set_wp_number_ == 2)
+                    {
+                        std::cout<<"set_wp_number_ : "<<set_wp_number_<<std::endl;
+                        waypoints_=_waypoints_2;
+                        lane_change_flag_=false;
+                        start_lane_change_idx_ = current_wp_idx_;
+                    }
+                    if(set_wp_number_ == 1)
+                    {
+                        std::cout<<"set_wp_number_ : "<<set_wp_number_<<std::endl;
+                        waypoints_=_waypoints_1;
+                    }
+                    
                     start_lane_change_flag_=false;
-                    start_lane_change_idx_=current_wp_idx_;
+                    //start_lane_change_idx_= current_wp_idx_;
+
                     // lane 변경 + 감속 플래그 on
                     //doing_lane_change_flag_=true; 
 
@@ -948,6 +990,40 @@ void TruckController::load_waypoints_1(const std::string &csv_path)
         if (ss >> wp.x >> comma >> wp.y >> comma >> wp.z )
         {
             _waypoints_1.push_back(wp);
+        } 
+        else 
+        {
+            
+        }
+    }
+}
+
+void TruckController::load_waypoints_2(const std::string &csv_path)
+{
+    std::ifstream ifs(csv_path+"2.csv");
+    if (!ifs.is_open()) 
+    {
+        
+        rclcpp::shutdown(); // 또는 다른 오류 처리 로직
+        return;
+    }
+
+    _waypoints_2.clear(); // 기존 웨이포인트 비우기
+    std::string line;
+    std::getline(ifs, line); // 헤더 라인 스킵
+
+    Waypoint wp;
+    int line_count = 1;
+    while (std::getline(ifs, line))
+    {
+        line_count++;
+        std::istringstream ss(line);
+        char comma; // 콤마 무시용
+
+        // CSV 형식이 "x,y,z" 라고 가정 (쉼표로 구분)
+        if (ss >> wp.x >> comma >> wp.y >> comma >> wp.z )
+        {
+            _waypoints_2.push_back(wp);
         } 
         else 
         {

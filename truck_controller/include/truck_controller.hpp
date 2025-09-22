@@ -127,13 +127,13 @@ private:
     bool overrun_lane_change_flag_ = false;
     bool lane_change_flag_ = false;
     bool decrease_speed_flag_ = false;
-    int start_lane_change_idx_;     //차선변경 시작 웨이포인트 인덱스
+    int start_lane_change_idx_ = 9999;     //차선변경 시작 웨이포인트 인덱스
     int overrun_lane_change_idx_;       //overrun 차량 웨이포인트 인덱스
 
     double distance_to_leader_;
     double throttle_value_;
 
-
+    int set_wp_number_;
     
 
 
@@ -142,6 +142,7 @@ private:
     // 웨이포인트 관련
     std::vector<Waypoint> _waypoints_0;
     std::vector<Waypoint> _waypoints_1;
+    std::vector<Waypoint> _waypoints_2;
     std::vector<Waypoint> waypoints_;
     
     // Formation 관리
@@ -194,6 +195,7 @@ private:
     void compute_control();
     void load_waypoints_0(const std::string &csv_path);
     void load_waypoints_1(const std::string &csv_path);
+    void load_waypoints_2(const std::string &csv_path);
     double distSq(Point2D p1, Point2D p2);
     //double calculate_target_velocity(double steer_angle);
     void publish_odom(double cur_x_, double cur_y_, double cur_z_, double yaw);

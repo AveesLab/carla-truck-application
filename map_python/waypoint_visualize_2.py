@@ -9,7 +9,7 @@ class CarlaWaypointVisualizer(Node):
         super().__init__('carla_waypoint_visualizer')
 
         # 경로 파일 경로
-        self.csv_path = '/home/avees/ros2_ws/src/truck_controller/data/1.csv'
+        self.csv_path = '/home/avees/ros2_ws/src/truck_controller/data/2.csv'
         
         # CARLA 클라이언트 연결
         self.client = carla.Client('localhost', 2000)
@@ -60,7 +60,7 @@ class CarlaWaypointVisualizer(Node):
             #     life_time=LT
             # )
             self.world.debug.draw_string(wp1, 'O', draw_shadow=False,
-            color=carla.Color(r=0, g=0, b=127), life_time=LT,
+            color=carla.Color(r=127, g=0, b=127), life_time=LT,
             persistent_lines=True)
 
 def main(args=None):
