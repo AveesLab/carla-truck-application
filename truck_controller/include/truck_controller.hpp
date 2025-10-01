@@ -9,6 +9,7 @@
 #include <std_msgs/msg/bool.hpp>
 #include <geometry_msgs/msg/point.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <std_msgs/msg/int32.hpp>
 #include <GeographicLib/LocalCartesian.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <tf2/LinearMath/Quaternion.h>
@@ -132,8 +133,18 @@ private:
     double distance_to_leader_;
     double throttle_value_;
 
+    // *changed
+    int formation_change_flag_=0;
 
-    
+    // *changed
+    double truck0_velocity_;
+    double truck1_velocity_;
+    double truck2_velocity_;
+
+    // *changed
+    bool truck0_overspeed_flag_;
+    bool truck1_overspeed_flag_;
+    bool truck2_overspeed_flag_;
 
 
     
@@ -153,7 +164,10 @@ private:
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_steer_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_ENU_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_lane_change_end_flag_;
+    
 
+    //*changed
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pub_formation_change_flag_;
     // Subscribers
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_formation_end_change_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_server_enu_;
@@ -161,6 +175,13 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck1_pos_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck2_pos_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_current_velocity_;
+
+
+
+    // *changed
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_truck0_velocity_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_truck1_velocity_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_truck2_velocity_;
 
     // 타이머 (주기적 제어용)
     rclcpp::TimerBase::SharedPtr timer_;
@@ -171,7 +192,16 @@ private:
     void truck0_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck1_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
+
+
+
     void current_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
+    void truck0_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
+    void truck1_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
+    void truck2_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
+    bool check_stable_speeds();
+    bool check_overspeed();
+
 
     // Formation 관련 함수들
 
