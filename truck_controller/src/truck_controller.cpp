@@ -113,6 +113,9 @@ TruckController::TruckController(int argu_id)
   pub_ENU_ = this->create_publisher<nav_msgs::msg::Odometry>(ns + "/ENU", 10 );
   pub_lane_change_end_flag_ = this->create_publisher<std_msgs::msg::Bool>("/lane_change_end_flag", 10);
 
+    // *changed
+  pub_formation_change_flag_ = this->create_publisher<std_msgs::msg::Int32>(ns + "/formation_change", 10);
+
   // 자신의 위치 업데이트를 위한 구독
   sub_server_enu_ = this->create_subscription<geometry_msgs::msg::Point>(
     ns + "/server/enu", 10,
@@ -122,6 +125,22 @@ TruckController::TruckController(int argu_id)
   std::string truck0_topic = "/truck0/server/enu";
   std::string truck1_topic = "/truck1/server/enu";
   std::string truck2_topic = "/truck2/server/enu";
+
+    // *changed
+    sub_truck0_velocity_ = this->create_subscription<std_msgs::msg::Float32>(
+        "/truck0/velocity", 10,
+        std::bind(&TruckController::truck0_velocity_callback, this, std::placeholders::_1));
+
+    sub_truck1_velocity_ = this->create_subscription<std_msgs::msg::Float32>(
+        "/truck1/velocity", 10,
+        std::bind(&TruckController::truck1_velocity_callback, this, std::placeholders::_1));
+
+    sub_truck2_velocity_ = this->create_subscription<std_msgs::msg::Float32>(
+        "/truck2/velocity", 10,
+        std::bind(&TruckController::truck2_velocity_callback, this, std::placeholders::_1));
+
+
+
   
   sub_truck0_pos_ = this->create_subscription<geometry_msgs::msg::Point>(
       truck0_topic, 10,
@@ -192,7 +211,7 @@ void TruckController::server_enu_callback(const geometry_msgs::msg::Point::Share
 // Formation 변경 시 새로운 FID 계산
 void TruckController::update_formation_id() {
     if(actor_id_ == 0){
-        std::cout<<"update_formation_id 호출"<<std::endl;
+        //std::cout<<"update_formation_id 호출"<<std::endl;
     }
     formation_change_count_++;
     // Formation 변경 시 FID 순환: 0->1, 1->2, 2->0
@@ -453,23 +472,16 @@ void TruckController::compute_control()
         
         check_mission_state_(current_wp_idx_);
         //for lane_change flag test
-        if(deadband_flag_ == true)
+        if(deadband_flag_ == true && check_stable_speeds())
         {
-            if(formation_id_ == 2)
-            {
-                if(current_wp_idx_ > 2200-180 && current_wp_idx_<2300-180) lane_change_flag_=true;
 
-                if(current_wp_idx_ > 6200-180 && current_wp_idx_<6300-180) lane_change_flag_=true;
-
-                if(current_wp_idx_ > 9000-180 && current_wp_idx_<9100-180) lane_change_flag_=true;
-            }else
-            {
-                if(current_wp_idx_ > 2200&& current_wp_idx_<2300) lane_change_flag_=true;
-                if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
-                if(current_wp_idx_ > 9000 && current_wp_idx_<9100) lane_change_flag_=true;
+            
+            if(current_wp_idx_ > 4500&& current_wp_idx_<4600) lane_change_flag_=true;
+            if(current_wp_idx_ > 12000 && current_wp_idx_<12100) lane_change_flag_=true;
+            if(current_wp_idx_ > 17100 && current_wp_idx_<17200) lane_change_flag_=true;
 
 
-            }
+            
  
 
             // if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
@@ -604,7 +616,12 @@ void TruckController::compute_control()
         //steer_msg.data = static_cast<float>(now_steer * -0.7);
         if(deadband_flag_ == true )
         {
-            if(steer_msg.data < 0.05 && steer_msg.data > -0.05)  steer_msg.data = 0.00;
+            if(lane_change_flag_ && formation_id_ ==2) {
+
+            }
+            else {
+                if(steer_msg.data < 0.05 && steer_msg.data > -0.05)  steer_msg.data = 0.00; 
+            }
         }
 
         else
@@ -631,6 +648,9 @@ void TruckController::compute_control()
             //     std::cout<<"lane_change_flag_ : "<<lane_change_flag_<<std::endl;
             // }
 
+            //*changed
+            if(formation_change_flag_ != 2) formation_change_flag_=0; //not changing
+                    
         }
         else
         {
@@ -638,7 +658,13 @@ void TruckController::compute_control()
             //lane change control ~ front first
             if(formation_id_ == 2)
             {
-                steer_msg.data =steer_msg.data + 0.09;
+                
+
+                // changed *
+                formation_change_flag_=1; //changing
+                lookahead_dist_ = 160; // temporary
+                steer_msg.data =steer_msg.data+0.05;
+                //steer_msg.data =steer_msg.data*0.75;
                 
                 if(start_lane_change_flag_ == true)
                 { 
@@ -650,6 +676,8 @@ void TruckController::compute_control()
                     start_lane_change_idx_=current_wp_idx_;
                     // lane 변경 + 감속 플래그 on
                     doing_lane_change_flag_=true; 
+                    steer_msg.data =steer_msg.data + 0.045;
+                    
 
 
                 }
@@ -662,6 +690,7 @@ void TruckController::compute_control()
                     doing_lane_change_flag_=false;
                     increase_speed_flag_=true;
                     check_overrun();
+                    
                     
                 }
                 if(overrun_lane_change_flag_ == true)
@@ -676,11 +705,12 @@ void TruckController::compute_control()
 
                     doing_lane_change_flag_=true;
                     start_lane_change_idx_ = 999999;
+                    
                 }
-                if((current_wp_idx_ - overrun_lane_change_idx_ > 100) && lane_number_== 0 &&doing_lane_change_flag_ == true)
+                if((current_wp_idx_ - overrun_lane_change_idx_ > 300) && lane_number_== 0 &&doing_lane_change_flag_ == true)
                 {
                     
-                    std::cout<<"lane change end"<<std::endl;
+                    //std::cout<<"lane change end"<<std::endl;
                     // 차선 변경 및 정착 -> lane_change 종료 
                     doing_lane_change_flag_=false;
 
@@ -690,9 +720,13 @@ void TruckController::compute_control()
                     std_msgs::msg::Bool lane_change_end_flag;
                     lane_change_end_flag.data = true;
                     pub_lane_change_end_flag_->publish(lane_change_end_flag);
-
+                    lookahead_dist_ = 80;
                     overrun_lane_change_idx_ = 999999;
                     formation_change_end_flag_=false;
+                    // *changed
+                    formation_change_flag_=2; //done changing
+                    
+
 
 
                     
@@ -705,6 +739,7 @@ void TruckController::compute_control()
 
                 if(start_lane_change_flag_ == true && lane_number_ == 1)
                 {
+                    
                     //std::cout<<"doing_lane_change_flag_ 1: "<<doing_lane_change_flag_<<std::endl;
                     //웨이포인트 200개 동안 차선변경 + 정착 중에 종방향제어
                     distance_to_leader =  get_distance_to_leader(); 
@@ -722,16 +757,18 @@ void TruckController::compute_control()
                     //웨이포인트 200개 동안 차선변경 + 정착 중에 종방향제어
                     
                     distance_to_leader =  get_distance_to_leader(); 
-                        throttle_value =  calculate_platoon_velocity(       0, 
-                                                                    distance_to_leader + 8,
-                                                                    current_velocity_*0.8,
-                                                                    steer_msg.data );
+                        // throttle_value =  calculate_platoon_velocity(       0, 
+                        //                                             distance_to_leader + 8,
+                        //                                             current_velocity_*0.5,
+                        //                                             steer_msg.data );
+
+                        throttle_value = 0.85;
                                             
                     if(lane_number_ == 0)
                     {
                         throttle_value =  calculate_platoon_velocity(   0, 
                                                         distance_to_leader,
-                                                        current_velocity_*1.7,
+                                                        current_velocity_*1.0,
                                                         steer_msg.data );
                     }
 
@@ -743,16 +780,13 @@ void TruckController::compute_control()
                     //std::cout<<"decrease_speed_flag_ : "<<decrease_speed_flag_<<std::endl;
                     // 레인 1번 진행중 중  -> 감속  종방향제어
                     distance_to_leader = get_distance_to_leader(); 
-                    throttle_value =  calculate_platoon_velocity(                        0, 
-                                                                            distance_to_leader,
-                                                                            current_velocity_ ,
-                                                                            steer_msg.data );
+                    throttle_value = 1.0;
                 }
 
 
                 if(overrun_lane_change_flag_ == true)
                 {
-                    std::cout<<"overrun_lane_change_flag_ : "<<overrun_lane_change_flag_<<std::endl;
+                    //std::cout<<"overrun_lane_change_flag_ : "<<overrun_lane_change_flag_<<std::endl;
                     // 2번 차량이 넘어선 경우 -> 정상 속도
                     distance_to_leader = get_distance_to_leader(); 
                     // throttle_value =  calculate_platoon_velocity( formation_id_, 
@@ -761,7 +795,7 @@ void TruckController::compute_control()
                     //                                                     steer_msg.data );
                     throttle_value =  calculate_platoon_velocity(   0, 
                                             distance_to_leader,
-                                            current_velocity_*2.0,
+                                            current_velocity_,
                                             steer_msg.data );
                  }
                 if(overrun_lane_change_flag_ == false && lane_change_flag_==false)
@@ -773,6 +807,7 @@ void TruckController::compute_control()
                                                                         distance_to_leader,
                                                                         current_velocity_, 
                                                                         steer_msg.data );
+                    
 
                 }
                 
@@ -780,12 +815,12 @@ void TruckController::compute_control()
             }
             else if(formation_id_ == 0)
             {
-                steer_msg.data =steer_msg.data - 0.04;
+                steer_msg.data =steer_msg.data - 0.09;
                 // 1번은 0번인 것처럼 주행
                 distance_to_leader = get_distance_to_leader(); 
                 throttle_value =  calculate_platoon_velocity( formation_id_ , 
                                                                     distance_to_leader,
-                                                                    current_velocity_*1.45, 
+                                                                    current_velocity_, 
                                                                     steer_msg.data );
 
                 //lane_change_flag_ 를 바꾸어 주는 코드 
@@ -805,14 +840,14 @@ void TruckController::compute_control()
             }
             else if(formation_id_ == 1)
             {
-                steer_msg.data =steer_msg.data - 0.04;
+                steer_msg.data =steer_msg.data - 0.09;
 
 
                 // 2번은 1번인 것처럼 주행
                 distance_to_leader = get_distance_to_leader(); 
                 throttle_value = calculate_platoon_velocity( formation_id_ , 
                                                                     distance_to_leader,
-                                                                    current_velocity_*1.5, 
+                                                                    current_velocity_, 
                                                                     steer_msg.data );
 
                 //lane_change_flag_ 를 바꾸어 주는 코드 
@@ -878,6 +913,21 @@ void TruckController::compute_control()
 
             // Odometry 발행 및 로깅
             publish_odom(cur_x_, cur_y_, cur_z_, heading);
+
+            
+            if(formation_change_flag_ == 3) formation_change_flag_=0;
+            //if(formation_change_flag_ == 2 && get_distance_to_leader() < desired_gap_ ) formation_change_flag_=3;
+            if(formation_change_flag_ == 2 && check_stable_speeds() ) formation_change_flag_=3;
+            //if(formation_change_flag_ == 2 && check_stable_speeds() && get_distance_to_leader() < desired_gap_ ) formation_change_flag_=3;            
+            std_msgs::msg::Int32 formation_change_flag_msg;
+            formation_change_flag_msg.data = formation_change_flag_;
+            pub_formation_change_flag_->publish(formation_change_flag_msg);
+
+
+            if(formation_id_ == 2) //std::cout<<"current_wp_idx_ : "<<current_wp_idx_<<std::endl;
+            if(formation_change_flag_ ==3) std::cout<<"formation_change_flag_ : "<<formation_change_flag_<<std::endl;
+
+
 
 
     }
@@ -1052,7 +1102,7 @@ void TruckController::truck2_pos_callback(const geometry_msgs::msg::Point::Share
 
 // 현재 포메이션 기준 선행 차량과의 거리 계산
 double TruckController::get_distance_to_leader() {
-    if(actor_id_ == 1) std::cout<<"actor 1 is formation : "<<formation_id_<<std::endl;
+
     // 유효하지 않은 leader_formation_id 체크
     if (formation_id_ == 0) {
         return std::numeric_limits<double>::infinity();  // 선두 차량은 무한대 거리 반환
@@ -1092,6 +1142,67 @@ void TruckController::current_velocity_callback(const std_msgs::msg::Float32::Sh
     current_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
 }
 
+
+void TruckController::truck0_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg)
+{   
+    truck0_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
+    if(truck0_velocity_ > 95) truck0_overspeed_flag_ = true;
+}
+
+
+void TruckController::truck1_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg)
+{   
+    truck1_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
+    if(truck1_velocity_ > 95) truck1_overspeed_flag_ = true;
+}
+
+void TruckController::truck2_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg)
+{   
+    truck2_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
+    if(truck1_velocity_ > 95) truck2_overspeed_flag_ = true;
+}
+
+bool TruckController::check_stable_speeds()
+{
+    double under_diff = 0.18;
+    double over_diff = 0.18;
+
+    if(truck0_velocity_ >STABLE_SPEED_ - under_diff  && truck0_velocity_ < STABLE_SPEED_ + over_diff &&
+       truck1_velocity_ >STABLE_SPEED_ - under_diff && truck1_velocity_ < STABLE_SPEED_ + over_diff &&
+       truck2_velocity_ >STABLE_SPEED_ - under_diff && truck2_velocity_ < STABLE_SPEED_ + over_diff)
+    {
+        std::cout<<"stable speeds"<<std::endl;
+        return true;
+    }
+    else
+    {
+        std::cout<<"unstable speeds"<<std::endl;
+        std::cout<<"truck0_velocity_ : "<<truck0_velocity_<<std::endl;
+        std::cout<<"truck1_velocity_ : "<<truck1_velocity_<<std::endl;
+        std::cout<<"truck2_velocity_ : "<<truck2_velocity_<<std::endl;
+
+        return false;
+    }
+}
+
+bool TruckController::check_overspeed()
+{
+    if(truck0_overspeed_flag_ == true || truck1_overspeed_flag_ == true || truck2_overspeed_flag_ == true)
+    {
+        if(check_stable_speeds())
+        {
+            truck0_overspeed_flag_=false;
+            truck1_overspeed_flag_=false;
+            truck2_overspeed_flag_=false;
+            return false;
+        } 
+        return true;
+    }   
+    else
+    {
+        return false;
+    }
+}
 
 
 // 2. FID와 거리에 따른 기준 속도 계산 (km/h)
@@ -1317,8 +1428,8 @@ void TruckController::check_mission_state_(int cur_idx_)
 void TruckController::check_overrun()
 {
 
-    int leader_formation_id = (1+ formation_change_count_*2) % 3;
-    int rear_first_id = (2 + formation_change_count_*2) % 3;
+    int leader_formation_id = (1 + 2*formation_change_count_) % 3;
+    int rear_first_id = (2 + 2*formation_change_count_) % 3;
 
     double distance_overrun = 0;
     if (!std::isnan(truck_positions_[leader_formation_id].x) && !std::isnan(truck_positions_[leader_formation_id].y))
@@ -1336,11 +1447,13 @@ void TruckController::check_overrun()
     if(formation_id_ == 0)
     {
         //std::cout<<"distance_overrun : "<<distance_overrun<<std::endl;
+        
     }
-    if(distance_overrun > desired_gap_   + TRUCK_LENGTH   )
+    if(distance_overrun > desired_gap_   + TRUCK_LENGTH*2   )
     {
         //std::cout<<"overrun computed"<<std::endl;
         overrun_lane_change_flag_=true;
+        
     }
     else
     {
