@@ -925,7 +925,7 @@ void TruckController::compute_control()
 
 
             if(formation_id_ == 2) //std::cout<<"current_wp_idx_ : "<<current_wp_idx_<<std::endl;
-            if(formation_change_flag_ ==3) std::cout<<"formation_change_flag_ : "<<formation_change_flag_<<std::endl;
+            if(formation_change_flag_ ==3) //std::cout<<"formation_change_flag_ : "<<formation_change_flag_<<std::endl;
 
 
 
