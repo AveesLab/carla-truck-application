@@ -472,7 +472,7 @@ void TruckController::compute_control()
         
         check_mission_state_(current_wp_idx_);
         //for lane_change flag test
-        if(deadband_flag_ == true)
+        if(deadband_flag_ == true && check_stable_speeds())
         {
             // *changed
             if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;

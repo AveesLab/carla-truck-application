@@ -194,7 +194,7 @@ private:
     void truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
 
 
-
+    //*chagned
     void current_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
     void truck0_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
     void truck1_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
@@ -204,7 +204,6 @@ private:
 
 
     // Formation 관련 함수들
-
     int calculate_leader_truck_number();
 
     // 속도 제어 관련 함수들
