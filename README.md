@@ -1,5 +1,5 @@
 # Carla for Truck Platooning - custom mode - path-tracking
-
+- **map:=Town04_Opt**
 - **make ros2_ws**
 make ros2_ws
 ```
