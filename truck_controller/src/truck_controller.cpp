@@ -53,8 +53,6 @@ TruckController::TruckController(int argu_id)
   this->declare_parameter<double>("EMERGENCY_GAP");
 
   // 군집 주행 관련 파라미터 선언
-
-
   std::string csv_path;
 
   this->get_parameter("csv_path", csv_path);

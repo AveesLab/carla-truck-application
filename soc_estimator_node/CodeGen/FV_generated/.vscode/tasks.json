@@ -1,0 +1,30 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "C/C++: Build FV1 model",
+            "command": "C:\\Program Files\\mingw64\\bin\\g++.exe",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                "ert_main.cpp",
+                "FV1.cpp",
+                "FV1_data.cpp",
+                "-o",
+                "${fileDirname}\\fv_model.exe"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Build FV1 model with g++"
+        }
+    ]
+}

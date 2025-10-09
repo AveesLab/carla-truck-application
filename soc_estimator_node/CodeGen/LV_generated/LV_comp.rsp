@@ -1,0 +1,7 @@
+﻿-IC:\Users\avees\Documents\MATLAB\Examples\R2024b\matlab\EV_Trucks
+-IC:\Users\avees\Documents\MATLAB\Examples\R2024b\matlab\EV_Trucks\LV_ert_rtw
+-I"C:\Program Files\MATLAB\R2024b\extern\include"
+-I"C:\Program Files\MATLAB\R2024b\simulink\include"
+-I"C:\Program Files\MATLAB\R2024b\rtw\c\src"
+-I"C:\Program Files\MATLAB\R2024b\rtw\c\src\ext_mode\common"
+-I"C:\Program Files\MATLAB\R2024b\rtw\c\ert"

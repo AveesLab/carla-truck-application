@@ -36,6 +36,8 @@ set(msg_files
   "msg/IMU.msg"
   "msg/V2XCAM.msg"
   "msg/V2XCUSTOM.msg"
+  "msg/TruckStatus.msg"
+  "msg/TruckCommand.msg"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -46,6 +48,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 install(TARGETS
         DESTINATION lib/${PROJECT_NAME})
 
-
+ament_export_dependencies(rosidl_default_runtime)
 
 ament_package()
