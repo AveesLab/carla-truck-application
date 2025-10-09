@@ -12,6 +12,7 @@ SOCEstimatorNode::SOCEstimatorNode()
     this->declare_parameter<std::string>("mode",     "LV");
     this->get_parameter("truck_id", truck_id_);
     this->get_parameter("mode",     mode_);
+    last_flag.resize(max_trucks_, 0);
 
     RCLCPP_INFO(get_logger(), "🛠️ Initialized soc_estimator for %s (mode=%s)", truck_id_.c_str(), mode_.c_str());
 
@@ -20,9 +21,19 @@ SOCEstimatorNode::SOCEstimatorNode()
     // subscribe velocity
     speed_sub_   = create_subscription<std_msgs::msg::Float32>("/" + truck_id_ + "/velocity", 10, std::bind(&SOCEstimatorNode::currentspeed_callback, this, std::placeholders::_1));
     // subscribe mode commands
-    command_sub_ = create_subscription<TruckCommand>("/" + truck_id_ + "/command", 10, std::bind(&SOCEstimatorNode::command_callback, this, std::placeholders::_1));
+    command_sub_ = create_subscription<TruckCommand>("/" + truck_id_ + "/command", 10, std::bind(&SOCEstimatorNode::formation_start_callback, this, std::placeholders::_1));
     // subscribe lane_change end flag
-    lane_change_end_sub_ = create_subscription<std_msgs::msg::Int32>("/" + truck_id_ + "/formation_flag", 10, std::bind(&SOCEstimatorNode::formation_end_callback, this, std::placeholders::_1));
+    for (int id = 0; id < max_trucks_; ++id) 
+    {
+        auto topic = "/truck" + std::to_string(id) + "/formation_change";
+        auto sub = create_subscription<std_msgs::msg::Int32>(topic, 10,
+        [this, id](const std_msgs::msg::Int32::SharedPtr msg)
+        {
+            this->formation_end_callback(msg, id);
+        });
+
+        formation_subs_.push_back(sub);  // vector에 저장해두면 나중에 소멸 방지됨
+    }
     // subscribe predecessor status
     int id      = std::stoi(truck_id_.substr(5));
     pred_id_    = (id - 1 + max_trucks_) % max_trucks_;
@@ -43,6 +54,7 @@ SOCEstimatorNode::SOCEstimatorNode()
     last_pos_       = 0.0;
     last_vel_       = 0.0;
     mode_changed_   = false;
+    
 }
 
 void SOCEstimatorNode::currentspeed_callback(const std_msgs::msg::Float32::SharedPtr msg)
@@ -50,22 +62,22 @@ void SOCEstimatorNode::currentspeed_callback(const std_msgs::msg::Float32::Share
     lv_curr_speed_ = msg->data;
 }
 
-void SOCEstimatorNode::formation_end_callback(const std_msgs::msg::Int32::SharedPtr msg)
+void SOCEstimatorNode::formation_end_callback(const std_msgs::msg::Int32::SharedPtr msg, int id)
 {
-    if (last_flag != 0 && msg->data == 0)
+
+    if (last_flag[id] != 0 && msg->data == 0)
     {
             rclcpp::Time end_time = this->now();
             double duration = (end_time - change_start_time_).seconds();
             double soc_drop = soc_at_change_start_ - last_soc_;
             RCLCPP_INFO(this->get_logger(), "✅ [Formation Change Complete] Duration = %.2fs, SOC Consumed = %.2f%%", duration, soc_drop);
-        
     }
 
-    last_flag = msg->data;
+    last_flag[id] = msg->data;
 }
 
 
-void SOCEstimatorNode::command_callback(const TruckCommand::SharedPtr msg)
+void SOCEstimatorNode::formation_start_callback(const TruckCommand::SharedPtr msg)
 {
     int id = std::stoi(truck_id_.substr(5));
     if (msg->truck_id == id && msg->mode != mode_) 

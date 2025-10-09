@@ -15,6 +15,7 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <ros2_msg/msg/truck_command.hpp>
 
 #include <vector>
 #include <string>
@@ -175,6 +176,7 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck1_pos_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck2_pos_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_current_velocity_;
+    rclcpp::Subscription<ros2_msg::msg::TruckCommand>::SharedPtr sub_formation_command_;
 
 
 
@@ -192,6 +194,7 @@ private:
     void truck0_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck1_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
+    void formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg);
 
 
 
@@ -204,7 +207,6 @@ private:
 
 
     // Formation 관련 함수들
-
     int calculate_leader_truck_number();
 
     // 속도 제어 관련 함수들

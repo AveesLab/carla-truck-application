@@ -18,8 +18,8 @@ public:
 
 private:
     void currentspeed_callback(const std_msgs::msg::Float32::SharedPtr msg);
-    void command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg);
-    void formation_end_callback(const std_msgs::msg::Int32::SharedPtr msg);
+    void formation_start_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg);
+    void formation_end_callback(const std_msgs::msg::Int32::SharedPtr msg, int id);
     void predecessor_status_callback(const ros2_msg::msg::TruckStatus::SharedPtr msg);
     void timer_callback();
 
@@ -29,7 +29,7 @@ private:
     std::string mode_;
     int pred_id_;
     int max_trucks_ = 3; 
-    int last_flag = 0;
+    std::vector<int> last_flag;
 
     BMS BMSObj;
 
@@ -41,7 +41,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr speed_sub_;
     rclcpp::Subscription<ros2_msg::msg::TruckCommand>::SharedPtr command_sub_;
     rclcpp::Subscription<ros2_msg::msg::TruckStatus>::SharedPtr predecessor_sub_;
-    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr lane_change_end_sub_;
+    std::vector<rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr> formation_subs_;
     rclcpp::TimerBase::SharedPtr timer_;
    	rclcpp::Time last_sim_time_;
    	rclcpp::Time change_start_time_;
