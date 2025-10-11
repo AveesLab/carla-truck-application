@@ -7,9 +7,9 @@
 //
 // Code generated for Simulink model 'BMS'.
 //
-// Model version                  : 10.80
+// Model version                  : 10.112
 // Simulink Coder version         : 24.2 (R2024b) 21-Jun-2024
-// C/C++ source code generated on : Wed Jun 25 19:23:09 2025
+// C/C++ source code generated on : Thu Oct  9 12:03:10 2025
 //
 // Target selection: ert.tlc
 // Embedded hardware selection: Intel->x86-64 (Linux 64)
@@ -23,7 +23,7 @@
 // Constant parameters (default storage)
 const BMS::ConstP rtConstP{
   // Computed Parameter: Weights_Value
-  //  Referenced by: '<S53>/Weights'
+  //  Referenced by: '<S16>/Weights'
 
   { 0.17626924812793732, 0.10196568816900253, -0.13060565292835236,
     -0.097318224608898163, 0.031848110258579254, 0.20839518308639526,
@@ -69,8 +69,8 @@ const BMS::ConstP rtConstP{
     -0.10477849841117859, 0.055993955582380295, -0.19198574125766754,
     -0.023353282362222672, 0.098894268274307251 },
 
-  // Computed Parameter: Bias_Value_d
-  //  Referenced by: '<S72>/Bias'
+  // Computed Parameter: Bias_Value_g
+  //  Referenced by: '<S35>/Bias'
 
   { 0.0014832996530458331, -0.0013135807821527123, 0.0033015487715601921,
     -0.0017713219858705997, 0.0024808221496641636, -0.0068661961704492569,
@@ -416,7 +416,7 @@ const BMS::ConstP rtConstP{
     -0.003590266453102231 },
 
   // Computed Parameter: RecurrentWeights_Value
-  //  Referenced by: '<S73>/RecurrentWeights'
+  //  Referenced by: '<S36>/RecurrentWeights'
 
   { 0.0066331722773611546, 0.0010052863508462906, -0.00534579623490572,
     -0.0062405848875641823, -0.0048169391229748726, -0.0055097839795053005,
@@ -87802,7 +87802,7 @@ const BMS::ConstP rtConstP{
     -0.00024585839128121734 },
 
   // Computed Parameter: InputWeights_Value
-  //  Referenced by: '<S65>/InputWeights'
+  //  Referenced by: '<S28>/InputWeights'
 
   { -0.0704461932182312, -0.0090506104752421379, 0.021307274699211121,
     -0.023644372820854187, 0.0573684386909008, 0.028529759496450424,
@@ -88829,8 +88829,8 @@ const BMS::ConstP rtConstP{
     -0.010537010617554188, -0.018687892705202103, -0.013877474702894688,
     -0.018011480569839478, -0.030951082706451416, 0.050888493657112122 },
 
-  // Computed Parameter: Bias_Value_p
-  //  Referenced by: '<S106>/Bias'
+  // Computed Parameter: Bias_Value_f
+  //  Referenced by: '<S69>/Bias'
 
   { 0.0094796968623995781, 0.0015857946127653122, 0.01004647184163332,
     -0.001841107034124434, 0.0094081005081534386, 0.016082687303423882,
@@ -89004,8 +89004,8 @@ const BMS::ConstP rtConstP{
     0.0088607575744390488, 0.01101477537304163, 0.011236459948122501,
     -0.0058841858990490437, 0.017492353916168213 },
 
-  // Computed Parameter: RecurrentWeights_Value_g
-  //  Referenced by: '<S107>/RecurrentWeights'
+  // Computed Parameter: RecurrentWeights_Value_b
+  //  Referenced by: '<S70>/RecurrentWeights'
 
   { 0.032203532755374908, 0.013500680215656757, -0.0030986096244305372,
     0.0009841318242251873, 0.0029085802379995584, 0.00829608365893364,
@@ -110854,8 +110854,8 @@ const BMS::ConstP rtConstP{
     0.0097107673063874245, -0.023148387670516968, -0.046706754714250565,
     0.013112355954945087 },
 
-  // Computed Parameter: InputWeights_Value_p
-  //  Referenced by: '<S99>/InputWeights'
+  // Computed Parameter: InputWeights_Value_g
+  //  Referenced by: '<S62>/InputWeights'
 
   { 0.0045846840366721153, -0.030081158503890038, 0.021468456834554672,
     -0.0096791721880435944, 0.0011558547848835588, 0.017147259786725044,
@@ -163521,7 +163521,7 @@ const BMS::ConstP rtConstP{
     99.9666, 99.9833, 100.0 },
 
   // Expression: battery_SOC_voltage
-  //  Referenced by: '<S1>/SOC-Vol'
+  //  Referenced by: '<S1>/SOC-Vol1'
 
   { 35.84591, 36.10202, 36.35814, 36.61425, 36.87037, 37.12649, 37.3826,
     37.63872, 37.89483, 38.09951, 38.20904, 38.28916, 38.37306, 38.42308,
@@ -163540,7 +163540,7 @@ const BMS::ConstP rtConstP{
     40.30627 },
 
   // Expression: battery_SOC_SOC
-  //  Referenced by: '<S1>/SOC-Vol'
+  //  Referenced by: '<S1>/SOC-Vol1'
 
   { 0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.11, 0.12,
     0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.2, 0.21, 0.22, 0.23, 0.24, 0.25,

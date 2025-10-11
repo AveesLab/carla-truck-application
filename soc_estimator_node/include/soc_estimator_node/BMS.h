@@ -7,9 +7,9 @@
 //
 // Code generated for Simulink model 'BMS'.
 //
-// Model version                  : 10.80
+// Model version                  : 10.112
 // Simulink Coder version         : 24.2 (R2024b) 21-Jun-2024
-// C/C++ source code generated on : Wed Jun 25 19:23:09 2025
+// C/C++ source code generated on : Thu Oct  9 12:03:10 2025
 //
 // Target selection: ert.tlc
 // Embedded hardware selection: Intel->x86-64 (Linux 64)
@@ -25,7 +25,6 @@
 #include <cmath>
 #include "rtw_continuous.h"
 #include "rtw_solver.h"
-#include <cstring>
 #define BMS_M                          (rtM)
 #ifndef struct_matlabshared_tracking_internal_
 #define struct_matlabshared_tracking_internal_
@@ -46,17 +45,6 @@ struct matlabshared_tracking_interna_e
 };
 
 #endif                                // struct_matlabshared_tracking_interna_e
-
-#ifndef ODE3_INTG
-#define ODE3_INTG
-
-// ODE3 Integration Data
-struct ODE3_IntgData {
-  double *y;                           // output
-  double *f[3];                        // derivatives
-};
-
-#endif
 
 extern "C"
 {
@@ -85,120 +73,53 @@ class BMS final
  public:
   // Block signals and states (default storage) for system '<Root>'
   struct DW {
-    double ProbeDimension[2];          // '<S98>/Probe Dimension'
-    double Assignment[128];            // '<S130>/Assignment'
-    double ProbeDimension_n[2];        // '<S64>/Probe Dimension'
-    double Assignment_i[256];          // '<S96>/Assignment'
-    double CellStateDelay_DSTATE[128]; // '<S101>/CellStateDelay'
-    double HiddenStateDelay_DSTATE[128];// '<S101>/HiddenStateDelay'
-    double CellStateDelay_DSTATE_d[256];// '<S67>/CellStateDelay'
-    double HiddenStateDelay_DSTATE_p[256];// '<S67>/HiddenStateDelay'
-    double last_x_PreviousInput[4];    // '<S24>/last_x'
-    double WxRhb[1024];                // '<S106>/Wx+Rh+b'
+    double ProbeDimension[2];          // '<S61>/Probe Dimension'
+    double Assignment[128];            // '<S93>/Assignment'
+    double ProbeDimension_o[2];        // '<S27>/Probe Dimension'
+    double Assignment_l[256];          // '<S59>/Assignment'
+    double CellStateDelay_DSTATE[128]; // '<S64>/CellStateDelay'
+    double HiddenStateDelay_DSTATE[128];// '<S64>/HiddenStateDelay'
+    double CellStateDelay_DSTATE_l[256];// '<S30>/CellStateDelay'
+    double HiddenStateDelay_DSTATE_i[256];// '<S30>/HiddenStateDelay'
+    double WxRhb[1024];                // '<S69>/Wx+Rh+b'
     double Wx[1024];
-    double Wx_m[512];                  // '<S99>/W*x'
-    double Bc[320];
-    double a__1[320];
-    double cTol[320];
-    double rtb_DivideOut_k_c[256];
+    double Wx_m[512];                  // '<S62>/W*x'
+    double rtb_DivideOut_j_c[256];
     double rtb_Tanh_k[256];
-    double DivideOut_f[256];           // '<S113>/DivideOut'
-    double vseq[202];
-    double rseq[200];
-    double fc_t1[128];                 // '<S101>/f*c_t-1'
-    double D[121];
-    double b_H[121];
-    double U[121];
-    double RLinv[121];
-    double TL[121];
-    double R[121];
-    double b_A[121];
-    double Opt[22];
-    double Rhs[22];
-    double zopt[11];
-    double f[11];
-    double r[11];
-    double z[11];
-    double tau[11];
-    double work[11];
-    double xk[4];
-    double xest[4];                    // '<S44>/optimizer'
-    double y_innov[2];
-    double ymax_incr[2];
-    double ymin_incr[2];
-    double TmpSignalConversionAtSFun_a[2];// '<S44>/optimizer'
+    double DivideOut_f[256];           // '<S76>/DivideOut'
+    double fc_t1[128];                 // '<S64>/f*c_t-1'
     double M[2];
-    double SOCTemp;                    // '<S1>/SOC-Temp'
-    double Vsoc;                       // '<S1>/SOC-Vol'
-    double Gain1;                      // '<S1>/Gain1'
-    double FilterCoefficient;          // '<S170>/Filter Coefficient'
-    double Brake1;                     // '<S1>/Brake[%]1'
-    double Accel1;                     // '<S1>/Accel1'
-    double Switch5;                    // '<S1>/Switch5'
-    double Square1;                    // '<S1>/Square1'
-    double Vol_pack;                   // '<S1>/Vol_pack'
+    double M_c[2];
     double Motor_Current_cell;         // '<S1>/Gain17'
-    double Minus1;                     // '<S5>/Minus1'
     double Veh_acceleartion;           // '<S1>/Divide15'
-    double IntegralGain;               // '<S164>/Integral Gain'
     double SOCswitch;                  // '<S1>/SOC switch'
-    double Acceleration_in;            // '<S7>/Acceleration_in'
-    double C_drag;                     // '<S7>/Drag coefficient'
-    double Acceleration_in_c;          // '<S9>/Acceleration_in'
-    double C_drag_e;                   // '<S9>/Drag coefficient1'
-    double SOC_t1_DSTATE;              // '<S1>/SOC_t-1'
-    double DiscreteTimeIntegrator_DSTATE;// '<S1>/Discrete-Time Integrator'
-    double DiscreteTimeIntegrator_DSTATE_e;// '<S5>/Discrete-Time Integrator'
+    double SOC_t2_DSTATE;              // '<S1>/SOC_t-2'
+    double DiscreteTimeIntegrator_DSTATE;// '<S5>/Discrete-Time Integrator'
+    double DiscreteTimeIntegrator_DSTATE_f;// '<S1>/Discrete-Time Integrator'
     double DiscreteTimeIntegrator1_DSTATE;// '<S1>/Discrete-Time Integrator1'
-    double last_mv_DSTATE;             // '<S24>/last_mv'
-    double P_d;                        // '<S6>/DataStoreMemory - P'
-    double x;                          // '<S6>/DataStoreMemory - x'
+    double P_k;                        // '<S8>/DataStoreMemory - P'
+    double x;                          // '<S8>/DataStoreMemory - x'
+    double DiscreteTimeIntegrator_d;   // '<S5>/Discrete-Time Integrator'
     double Add13;                      // '<S1>/Add13'
-    double DiscreteTimeIntegrator1;    // '<S1>/Discrete-Time Integrator1'
-    double ImpAsg_InsertedFor_Out1_at_;// '<S60>/Add'
-    double rtb_uDLookupTable1_c;
-    double rtb_y_d4_b;
-    double rtb_y_h_p;
-    double rtb_Sum_f_c;
-    double rtb_y_g_f;
-    double rtb_y_n_g;
-    double rtb_y_cs_g;
-    double rtb_y_m;
-    double rtb_TmpSignalConversionAtSFun_n;
-    double y_innov_p;
-    double y_innov_l;
-    double xk_j;
-    double SpeedDifferent;             // '<S1>/Speed Different'
-    double Rolling_Loss1;              // '<S1>/Rolling_Loss1'
-    double FromWorkspace3;             // '<S1>/From Workspace3'
-    double FromWorkspace4;             // '<S1>/From Workspace4'
+    double Divide2;                    // '<S1>/Divide2'
+    double Motor_TorqueNm_d;           // '<S1>/Divide1'
+    double ImpAsg_InsertedFor_Out1_at_;// '<S23>/Add'
+    double SOCTemp;
+    double Vsoc;
+    double uDLookupTable1;             // '<S1>/2-D Lookup Table1'
     double UnitConversion4;            // '<S1>/Unit Conversion4'
     double Step;                       // '<S1>/Step'
-    double DiscreteTimeIntegrator;     // '<S5>/Discrete-Time Integrator'
-    double rMin;
-    double Xnorm0;
-    double cMin;
-    double cVal;
-    double t;
+    double F_rolling;                  // '<S1>/Switch1'
+    double FromWorkspace3;             // '<S1>/From Workspace3'
+    double Rolling_Loss1;              // '<S1>/Rolling_Loss1'
+    double DiscreteTimeIntegrator;     // '<S1>/Discrete-Time Integrator'
+    double b_atmp;
     double beta1;
-    double b_A_d;
-    double RLinv_g;
+    double M_b;
     double scale;
     double absxk;
-    double t_l;
-    double b_atmp;
-    double beta1_d;
-    double M_d;
-    double scale_l;
-    double absxk_o;
-    double t_b;
-    double temp;
-    double c;
+    double t;
     double a;
-    double b;
-    double scale_n;
-    double absxk_b;
-    double t_ln;
     struct {
       void *TimePtr;
       void *DataPtr;
@@ -251,13 +172,13 @@ class BMS final
       void *TimePtr;
       void *DataPtr;
       void *RSimInfoPtr;
-    } FromWorkspace4_PWORK;            // '<S1>/From Workspace4'
+    } Friction_Loss1_PWORK;            // '<S1>/Friction_Loss1'
 
     struct {
       void *TimePtr;
       void *DataPtr;
       void *RSimInfoPtr;
-    } Friction_Loss1_PWORK;            // '<S1>/Friction_Loss1'
+    } FromWorkspace4_PWORK;            // '<S1>/From Workspace4'
 
     struct {
       void *TimePtr;
@@ -283,13 +204,6 @@ class BMS final
       void *RSimInfoPtr;
     } FromWorkspace14_PWORK;           // '<S1>/From Workspace14'
 
-    struct {
-      void *TimePtr;
-      void *DataPtr;
-      void *RSimInfoPtr;
-    } FromWorkspace9_PWORK;            // '<S1>/From Workspace9'
-
-    int32_t iC[320];
     struct {
       int PrevIndex;
     } FromWorkspace19_IWORK;           // '<S1>/From Workspace19'
@@ -324,11 +238,11 @@ class BMS final
 
     struct {
       int PrevIndex;
-    } FromWorkspace4_IWORK;            // '<S1>/From Workspace4'
+    } Friction_Loss1_IWORK;            // '<S1>/Friction_Loss1'
 
     struct {
       int PrevIndex;
-    } Friction_Loss1_IWORK;            // '<S1>/Friction_Loss1'
+    } FromWorkspace4_IWORK;            // '<S1>/From Workspace4'
 
     struct {
       int PrevIndex;
@@ -346,120 +260,55 @@ class BMS final
       int PrevIndex;
     } FromWorkspace14_IWORK;           // '<S1>/From Workspace14'
 
-    struct {
-      int PrevIndex;
-    } FromWorkspace9_IWORK;            // '<S1>/From Workspace9'
-
-    int32_t ii;
     int32_t knt;
-    int32_t lastc;
-    int32_t ForEach_itr_h;
+    int32_t s27_iter;
+    int32_t ForEach_itr;
     int32_t i;
-    int32_t nA;
-    int32_t tmp;
-    int32_t exponent;
-    int32_t b_exponent;
-    int32_t i_b;
-    int32_t iSave;
-    int32_t iC_d;
-    int32_t U_tmp;
-    int32_t k_i;
-    int32_t ii_e;
-    int32_t knt_b;
-    int32_t b_lastv;
-    int32_t coltop;
-    int32_t b_coltop;
-    int32_t vectorUB;
-    int32_t vectorUB_tmp;
-    int32_t kend;
-    int32_t k;
     int32_t b_i;
-    int32_t knt_j;
-    int32_t jA;
-    int32_t j;
-    int32_t b_f;
-    int32_t ijA;
-    int32_t b_iy;
-    int32_t b_a;
-    int32_t d;
-    int32_t ia;
-    int32_t k_j;
-    int16_t b_Mrows;
-    int8_t TmpSignalConversionAtSFun_m[2];// '<S44>/optimizer'
-    int8_t SwitchCase_ActiveSubsystem; // '<S1>/Switch Case'
-    int8_t rtAction;
-    bool Memory_PreviousInput[320];    // '<S24>/Memory'
-    bool iAout[320];                   // '<S44>/optimizer'
-    bool ymax_incr_flag[2];
-    bool ymin_incr_flag[2];
-    bool Compare;                      // '<S4>/Compare'
-    bool icLoad;                       // '<S101>/CellStateDelay'
-    bool icLoad_d;                     // '<S101>/HiddenStateDelay'
-    bool icLoad_e;                     // '<S67>/CellStateDelay'
-    bool icLoad_e2;                    // '<S67>/HiddenStateDelay'
-    bool umax_incr_flag;
-    bool umin_incr_flag;
-    bool b_Del_Save_Flag0;
-    bool b_j;
-    bool cTolComputed;
-    bool DualFeasible;
-    bool ColdReset;
-  };
-
-  // Continuous states (default storage)
-  struct X {
-    double Integrator_CSTATE;          // '<S167>/Integrator'
-    double Filter_CSTATE;              // '<S162>/Filter'
-  };
-
-  // State derivatives (default storage)
-  struct XDot {
-    double Integrator_CSTATE;          // '<S167>/Integrator'
-    double Filter_CSTATE;              // '<S162>/Filter'
-  };
-
-  // State disabled
-  struct XDis {
-    bool Integrator_CSTATE;            // '<S167>/Integrator'
-    bool Filter_CSTATE;                // '<S162>/Filter'
+    int32_t b_i_p;
+    int32_t knt_c;
+    bool icLoad;                       // '<S64>/CellStateDelay'
+    bool icLoad_l;                     // '<S64>/HiddenStateDelay'
+    bool icLoad_b;                     // '<S30>/CellStateDelay'
+    bool icLoad_h;                     // '<S30>/HiddenStateDelay'
   };
 
   // Constant parameters (default storage)
   struct ConstP {
     // Computed Parameter: Weights_Value
-    //  Referenced by: '<S53>/Weights'
+    //  Referenced by: '<S16>/Weights'
 
     double Weights_Value[128];
 
-    // Computed Parameter: Bias_Value_d
-    //  Referenced by: '<S72>/Bias'
+    // Computed Parameter: Bias_Value_g
+    //  Referenced by: '<S35>/Bias'
 
-    double Bias_Value_d[1024];
+    double Bias_Value_g[1024];
 
     // Computed Parameter: RecurrentWeights_Value
-    //  Referenced by: '<S73>/RecurrentWeights'
+    //  Referenced by: '<S36>/RecurrentWeights'
 
     double RecurrentWeights_Value[262144];
 
     // Computed Parameter: InputWeights_Value
-    //  Referenced by: '<S65>/InputWeights'
+    //  Referenced by: '<S28>/InputWeights'
 
     double InputWeights_Value[3072];
 
-    // Computed Parameter: Bias_Value_p
-    //  Referenced by: '<S106>/Bias'
+    // Computed Parameter: Bias_Value_f
+    //  Referenced by: '<S69>/Bias'
 
-    double Bias_Value_p[512];
+    double Bias_Value_f[512];
 
-    // Computed Parameter: RecurrentWeights_Value_g
-    //  Referenced by: '<S107>/RecurrentWeights'
+    // Computed Parameter: RecurrentWeights_Value_b
+    //  Referenced by: '<S70>/RecurrentWeights'
 
-    double RecurrentWeights_Value_g[65536];
+    double RecurrentWeights_Value_b[65536];
 
-    // Computed Parameter: InputWeights_Value_p
-    //  Referenced by: '<S99>/InputWeights'
+    // Computed Parameter: InputWeights_Value_g
+    //  Referenced by: '<S62>/InputWeights'
 
-    double InputWeights_Value_p[131072];
+    double InputWeights_Value_g[131072];
 
     // Expression: [19.9694
     // 19.9729
@@ -8448,14 +8297,14 @@ class BMS final
     double SOCTemp_bp01Data[3988];
 
     // Expression: battery_SOC_voltage
-    //  Referenced by: '<S1>/SOC-Vol'
+    //  Referenced by: '<S1>/SOC-Vol1'
 
-    double SOCVol_tableData[101];
+    double SOCVol1_tableData[101];
 
     // Expression: battery_SOC_SOC
-    //  Referenced by: '<S1>/SOC-Vol'
+    //  Referenced by: '<S1>/SOC-Vol1'
 
-    double SOCVol_bp01Data[101];
+    double SOCVol1_bp01Data[101];
 
     // Expression: motor_torque_RPM
     //  Referenced by: '<S1>/MAX Torque1'
@@ -8490,14 +8339,11 @@ class BMS final
 
   // External inputs (root inport signals with default storage)
   struct ExtU {
-    double Targetspeed;                // '<Root>/Target speed'
-    double pos_ego;                    // '<Root>/pos_ego'
-    double vel_ego;                    // '<Root>/vel_ego'
-    double soc_ego;                    // '<Root>/soc_ego'
-    double pos_follow;                 // '<Root>/pos_follow'
-    double pos_front;                  // '<Root>/pos_front'
-    double vel_front;                  // '<Root>/vel_front'
+    double velocity_control;           // '<Root>/velocity_control'
+    double velocity;                   // '<Root>/velocity'
+    double IVD;                        // '<Root>/IVD'
     double Mode;                       // '<Root>/Mode'
+    double Mass_kg;                    // '<Root>/Mass_kg'
   };
 
   // External outputs (root outports fed by signals with default storage)
@@ -8505,37 +8351,13 @@ class BMS final
     double Accelms2;                   // '<Root>/Accel[ms2]'
     double Speedms;                    // '<Root>/Speed[ms]'
     double Positionm;                  // '<Root>/Position[m]'
-    double Battery_SOC;                // '<Root>/Battery_SOC[%]'
+    double SOC;                        // '<Root>/SOC'
   };
 
   // Real-time Model Data Structure
-  using odeFSubArray = double[2];
   struct RT_MODEL {
     const char *errorStatus;
     RTWSolverInfo solverInfo;
-    X *contStates;
-    int *periodicContStateIndices;
-    double *periodicContStateRanges;
-    double *derivs;
-    XDis *contStateDisabled;
-    bool zCCacheNeedsReset;
-    bool derivCacheNeedsReset;
-    bool CTOutputIncnstWithState;
-    double odeY[2];
-    double odeF[3][2];
-    ODE3_IntgData intgData;
-
-    //
-    //  Sizes:
-    //  The following substructure contains sizes information
-    //  for many of the model attributes such as inputs, outputs,
-    //  dwork, sample times, etc.
-
-    struct {
-      int numContStates;
-      int numPeriodicContStates;
-      int numSampTimes;
-    } Sizes;
 
     //
     //  Timing:
@@ -8546,46 +8368,23 @@ class BMS final
       uint32_t clockTick0;
       double stepSize0;
       uint32_t clockTick1;
-      double tStart;
       SimTimeStep simTimeStep;
       bool stopRequestedFlag;
       double *t;
       double tArray[2];
     } Timing;
 
-    XDis* getContStateDisabled() const;
-    void setContStateDisabled(XDis* aContStateDisabled);
-    const char** getErrorStatusPtr();
-    X* getContStates() const;
-    void setContStates(X* aContStates);
+    double** getTPtrPtr();
     bool getStopRequested() const;
     void setStopRequested(bool aStopRequested);
-    ODE3_IntgData getIntgData() const;
-    void setIntgData(ODE3_IntgData aIntgData);
-    bool getDerivCacheNeedsReset() const;
-    void setDerivCacheNeedsReset(bool aDerivCacheNeedsReset);
     const char* getErrorStatus() const;
     void setErrorStatus(const char* const aErrorStatus);
-    bool getContTimeOutputInconsistentWithStateAtMajorStepFlag() const;
-    void setContTimeOutputInconsistentWithStateAtMajorStepFlag(bool
-      aContTimeOutputInconsistentWithStateAtMajorStepFlag);
-    bool isMajorTimeStep() const;
-    const odeFSubArray* getOdeF() const;
-    bool isMinorTimeStep() const;
-    const double* getOdeY() const;
-    int* getPeriodicContStateIndices() const;
-    void setPeriodicContStateIndices(int* aPeriodicContStateIndices);
     double* getTPtr() const;
     void setTPtr(double* aTPtr);
-    double* getPeriodicContStateRanges() const;
-    void setPeriodicContStateRanges(double* aPeriodicContStateRanges);
     bool* getStopRequestedPtr();
-    double** getTPtrPtr();
-    double getTStart() const;
-    bool getZCCacheNeedsReset() const;
-    void setZCCacheNeedsReset(bool aZCCacheNeedsReset);
-    double* getdX() const;
-    void setdX(double* adX);
+    const char** getErrorStatusPtr();
+    bool isMajorTimeStep() const;
+    bool isMinorTimeStep() const;
   };
 
   // Copy Constructor
@@ -8626,55 +8425,23 @@ class BMS final
   // Block states
   DW rtDW;
 
-  // Block continuous states
-  X rtX;
-
-  // Block Continuous state disabled vector
-  XDis rtXDis;
-
-  // private member function(s) for subsystem '<S11>/DataTypeConversion_L0'
-  static void DataTypeConversion_L0(double rtu_u, double *rty_y);
-
-  // private member function(s) for subsystem '<S76>/Sigmoid Layer'
+  // private member function(s) for subsystem '<S39>/Sigmoid Layer'
   static void SigmoidLayer(const double rtu_In1[256], double rty_Out1[256]);
 
-  // private member function(s) for subsystem '<S88>/Tanh Layer'
+  // private member function(s) for subsystem '<S51>/Tanh Layer'
   static void TanhLayer(const double rtu_In1[256], double rty_Out1[256]);
 
-  // private member function(s) for subsystem '<S110>/Sigmoid Layer'
-  static void SigmoidLayer_p(const double rtu_In1[128], double rty_Out1[128]);
+  // private member function(s) for subsystem '<S73>/Sigmoid Layer'
+  static void SigmoidLayer_n(const double rtu_In1[128], double rty_Out1[128]);
 
-  // private member function(s) for subsystem '<S122>/Tanh Layer'
-  static void TanhLayer_b(const double rtu_In1[128], double rty_Out1[128]);
+  // private member function(s) for subsystem '<S85>/Tanh Layer'
+  static void TanhLayer_m(const double rtu_In1[128], double rty_Out1[128]);
 
   // private member function(s) for subsystem '<Root>'
-  double norm(const double x[11]);
-  double maximum(const double x[11]);
-  double xnrm2(int32_t n, const double x[121], int32_t ix0);
+  double xnrm2(int32_t n, const double x[2], int32_t ix0);
   double rt_hypotd_snf_e(double u0, double u1);
-  void xgemv(int32_t b_m, int32_t n, const double b_A[121], int32_t ia0, const
-             double x[121], int32_t ix0, double y[11]);
-  void xgerc(int32_t b_m, int32_t n, double alpha1, int32_t ix0, const double y
-             [11], double b_A[121], int32_t ia0);
-  void KWIKfactor(const double b_Ac[3520], const int32_t iC[320], int32_t nA,
-                  const double b_Linv[121], double D[121], double b_H[121],
-                  int32_t n, double RLinv[121], double *Status);
-  void DropConstraint(int32_t kDrop, bool iA[320], int32_t *nA, int32_t iC[320]);
-  void qpkwik(const double b_Linv[121], const double b_Hinv[121], const double
-              f[11], const double b_Ac[3520], const double b[320], bool iA[320],
-              int32_t maxiter, double FeasTol, double x[11], double lambda[320],
-              int32_t *status);
-  double xnrm2_e(int32_t n, const double x[2], int32_t ix0);
   double qrFactor(double A, double S, double Ns);
   double trisolve(double A, double B_0);
-
-  // Global mass matrix
-
-  // Continuous states update member function
-  void rt_ertODEUpdateContinuousStates(RTWSolverInfo *si );
-
-  // Derivatives member function
-  void BMS_derivatives();
 
   // Real-Time Model
   RT_MODEL rtM;
@@ -8686,61 +8453,26 @@ extern const BMS::ConstP rtConstP;
 //-
 //  These blocks were eliminated from the model due to optimizations:
 //
-//  Block '<S24>/Constant' : Unused code path elimination
-//  Block '<S24>/Floor' : Unused code path elimination
-//  Block '<S24>/Floor1' : Unused code path elimination
-//  Block '<S25>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S26>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S27>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S28>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S29>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S30>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S31>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S32>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S33>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S34>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S35>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S36>/Matrix Dimension Check' : Unused code path elimination
-//  Block '<S37>/Vector Dimension Check' : Unused code path elimination
-//  Block '<S38>/Vector Dimension Check' : Unused code path elimination
-//  Block '<S39>/Vector Dimension Check' : Unused code path elimination
-//  Block '<S40>/Vector Dimension Check' : Unused code path elimination
-//  Block '<S41>/Vector Dimension Check' : Unused code path elimination
-//  Block '<S42>/Vector Dimension Check' : Unused code path elimination
-//  Block '<S24>/Min' : Unused code path elimination
-//  Block '<S24>/constant' : Unused code path elimination
-//  Block '<S43>/Vector Dimension Check' : Unused code path elimination
-//  Block '<S24>/umin_scale2' : Unused code path elimination
-//  Block '<S24>/umin_scale3' : Unused code path elimination
-//  Block '<S24>/umin_scale5' : Unused code path elimination
-//  Block '<S24>/ym_zero' : Unused code path elimination
-//  Block '<S23>/m_zero' : Unused code path elimination
-//  Block '<S23>/p_zero' : Unused code path elimination
-//  Block '<S6>/checkMeasurementFcn1Signals' : Unused code path elimination
-//  Block '<S6>/checkStateTransitionFcnSignals' : Unused code path elimination
-//  Block '<S63>/Data Type Duplicate' : Unused code path elimination
-//  Block '<S79>/Data Type Duplicate' : Unused code path elimination
-//  Block '<S83>/Data Type Duplicate' : Unused code path elimination
-//  Block '<S87>/Data Type Duplicate' : Unused code path elimination
-//  Block '<S96>/Data Type Duplicate' : Unused code path elimination
-//  Block '<S113>/Data Type Duplicate' : Unused code path elimination
-//  Block '<S117>/Data Type Duplicate' : Unused code path elimination
-//  Block '<S121>/Data Type Duplicate' : Unused code path elimination
-//  Block '<S130>/Data Type Duplicate' : Unused code path elimination
-//  Block '<S24>/Reshape' : Reshape block reduction
-//  Block '<S24>/Reshape1' : Reshape block reduction
-//  Block '<S24>/Reshape2' : Reshape block reduction
-//  Block '<S24>/Reshape3' : Reshape block reduction
-//  Block '<S24>/Reshape4' : Reshape block reduction
-//  Block '<S24>/Reshape5' : Reshape block reduction
-//  Block '<S6>/DataTypeConversion_Enable1' : Eliminate redundant data type conversion
-//  Block '<S6>/DataTypeConversion_Q' : Eliminate redundant data type conversion
-//  Block '<S6>/DataTypeConversion_R1' : Eliminate redundant data type conversion
-//  Block '<S6>/DataTypeConversion_uMeas1' : Eliminate redundant data type conversion
-//  Block '<S6>/DataTypeConversion_uState' : Eliminate redundant data type conversion
-//  Block '<S6>/DataTypeConversion_y1' : Eliminate redundant data type conversion
-//  Block '<S65>/Data Type Conversion' : Eliminate redundant data type conversion
-//  Block '<S99>/Data Type Conversion' : Eliminate redundant data type conversion
+//  Block '<S8>/checkMeasurementFcn1Signals' : Unused code path elimination
+//  Block '<S8>/checkStateTransitionFcnSignals' : Unused code path elimination
+//  Block '<S26>/Data Type Duplicate' : Unused code path elimination
+//  Block '<S42>/Data Type Duplicate' : Unused code path elimination
+//  Block '<S46>/Data Type Duplicate' : Unused code path elimination
+//  Block '<S50>/Data Type Duplicate' : Unused code path elimination
+//  Block '<S59>/Data Type Duplicate' : Unused code path elimination
+//  Block '<S76>/Data Type Duplicate' : Unused code path elimination
+//  Block '<S80>/Data Type Duplicate' : Unused code path elimination
+//  Block '<S84>/Data Type Duplicate' : Unused code path elimination
+//  Block '<S93>/Data Type Duplicate' : Unused code path elimination
+//  Block '<S1>/Scope' : Unused code path elimination
+//  Block '<S8>/DataTypeConversion_Enable1' : Eliminate redundant data type conversion
+//  Block '<S8>/DataTypeConversion_Q' : Eliminate redundant data type conversion
+//  Block '<S8>/DataTypeConversion_R1' : Eliminate redundant data type conversion
+//  Block '<S8>/DataTypeConversion_uMeas1' : Eliminate redundant data type conversion
+//  Block '<S8>/DataTypeConversion_uState' : Eliminate redundant data type conversion
+//  Block '<S8>/DataTypeConversion_y1' : Eliminate redundant data type conversion
+//  Block '<S28>/Data Type Conversion' : Eliminate redundant data type conversion
+//  Block '<S62>/Data Type Conversion' : Eliminate redundant data type conversion
 //  Block '<S1>/Zero-Order Hold' : Eliminated since input and output rates are identical
 //  Block '<S1>/Zero-Order Hold1' : Eliminated since input and output rates are identical
 
@@ -8757,196 +8489,106 @@ extern const BMS::ConstP rtConstP;
 //  MATLAB hilite_system command to trace the generated code back
 //  to the parent model.  For example,
 //
-//  hilite_system('EV_Modeling/BMS')    - opens subsystem EV_Modeling/BMS
-//  hilite_system('EV_Modeling/BMS/Kp') - opens and selects block Kp
+//  hilite_system('EV_Model/BMS with LSTM')    - opens subsystem EV_Model/BMS with LSTM
+//  hilite_system('EV_Model/BMS with LSTM/Kp') - opens and selects block Kp
 //
 //  Here is the system hierarchy for this model
 //
-//  '<Root>' : 'EV_Modeling'
-//  '<S1>'   : 'EV_Modeling/BMS'
-//  '<S2>'   : 'EV_Modeling/BMS/ Normalization'
-//  '<S3>'   : 'EV_Modeling/BMS/ACC system'
-//  '<S4>'   : 'EV_Modeling/BMS/Compare To Constant3'
-//  '<S5>'   : 'EV_Modeling/BMS/Coulomb Counting'
-//  '<S6>'   : 'EV_Modeling/BMS/Extended Kalman Filter'
-//  '<S7>'   : 'EV_Modeling/BMS/FV'
-//  '<S8>'   : 'EV_Modeling/BMS/LSTM'
-//  '<S9>'   : 'EV_Modeling/BMS/LV'
-//  '<S10>'  : 'EV_Modeling/BMS/PID Controller'
-//  '<S11>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System'
-//  '<S12>'  : 'EV_Modeling/BMS/ACC system/MATLAB Function'
-//  '<S13>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/DataTypeConversion_L0'
-//  '<S14>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/DataTypeConversion_amax'
-//  '<S15>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/DataTypeConversion_amin'
-//  '<S16>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/DataTypeConversion_atrack'
-//  '<S17>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/DataTypeConversion_dmin'
-//  '<S18>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/DataTypeConversion_optsgn'
-//  '<S19>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/DataTypeConversion_reldist'
-//  '<S20>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/DataTypeConversion_vego'
-//  '<S21>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/DataTypeConversion_vlead'
-//  '<S22>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/DataTypeConversion_vset'
-//  '<S23>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC'
-//  '<S24>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC'
-//  '<S25>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Matrix Signal Check'
-//  '<S26>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Matrix Signal Check1'
-//  '<S27>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Matrix Signal Check2'
-//  '<S28>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Preview Signal Check'
-//  '<S29>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Preview Signal Check1'
-//  '<S30>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Preview Signal Check2'
-//  '<S31>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Preview Signal Check3'
-//  '<S32>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Preview Signal Check4'
-//  '<S33>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Preview Signal Check5'
-//  '<S34>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Preview Signal Check6'
-//  '<S35>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Preview Signal Check7'
-//  '<S36>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Preview Signal Check8'
-//  '<S37>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Scalar Signal Check'
-//  '<S38>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Scalar Signal Check1'
-//  '<S39>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Scalar Signal Check2'
-//  '<S40>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Vector Signal Check'
-//  '<S41>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Vector Signal Check1'
-//  '<S42>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/MPC Vector Signal Check6'
-//  '<S43>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/moorx'
-//  '<S44>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/optimizer'
-//  '<S45>'  : 'EV_Modeling/BMS/ACC system/Adaptive Cruise Control System/MPC/MPC/optimizer/optimizer'
-//  '<S46>'  : 'EV_Modeling/BMS/Extended Kalman Filter/Correct1'
-//  '<S47>'  : 'EV_Modeling/BMS/Extended Kalman Filter/Output'
-//  '<S48>'  : 'EV_Modeling/BMS/Extended Kalman Filter/Predict'
-//  '<S49>'  : 'EV_Modeling/BMS/Extended Kalman Filter/Output/MATLAB Function'
-//  '<S50>'  : 'EV_Modeling/BMS/FV/Drag coefficient'
-//  '<S51>'  : 'EV_Modeling/BMS/LSTM/dropout_1'
-//  '<S52>'  : 'EV_Modeling/BMS/LSTM/dropout_2'
-//  '<S53>'  : 'EV_Modeling/BMS/LSTM/fc'
-//  '<S54>'  : 'EV_Modeling/BMS/LSTM/layer'
-//  '<S55>'  : 'EV_Modeling/BMS/LSTM/lstm_1'
-//  '<S56>'  : 'EV_Modeling/BMS/LSTM/lstm_2'
-//  '<S57>'  : 'EV_Modeling/BMS/LSTM/fc/BiasAddition'
-//  '<S58>'  : 'EV_Modeling/BMS/LSTM/fc/Reshape'
-//  '<S59>'  : 'EV_Modeling/BMS/LSTM/fc/BiasAddition/AddForEachSeq'
-//  '<S60>'  : 'EV_Modeling/BMS/LSTM/fc/BiasAddition/AddForEachSeq/AddForEachSeq'
-//  '<S61>'  : 'EV_Modeling/BMS/LSTM/fc/Reshape/Noop'
-//  '<S62>'  : 'EV_Modeling/BMS/LSTM/layer/Sigmoid_VSS'
-//  '<S63>'  : 'EV_Modeling/BMS/LSTM/layer/Sigmoid_VSS/None'
-//  '<S64>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem'
-//  '<S65>'  : 'EV_Modeling/BMS/LSTM/lstm_1/InputWeightsMatrixMultiply'
-//  '<S66>'  : 'EV_Modeling/BMS/LSTM/lstm_1/OutputDataType'
-//  '<S67>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore'
-//  '<S68>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/OutputMode'
-//  '<S69>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f'
-//  '<S70>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i'
-//  '<S71>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o'
-//  '<S72>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/LinearGateAdd'
-//  '<S73>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/RecurrentWeightsMatrixMultiply'
-//  '<S74>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c'
-//  '<S75>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g'
-//  '<S76>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid'
-//  '<S77>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer'
-//  '<S78>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer/Sigmoid_VSS'
-//  '<S79>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
-//  '<S80>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid'
-//  '<S81>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer'
-//  '<S82>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer/Sigmoid_VSS'
-//  '<S83>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
-//  '<S84>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid'
-//  '<S85>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer'
-//  '<S86>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer/Sigmoid_VSS'
-//  '<S87>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
-//  '<S88>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh'
-//  '<S89>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer'
-//  '<S90>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer/Tanh_VSS'
-//  '<S91>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer/Tanh_VSS/None'
-//  '<S92>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh'
-//  '<S93>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer'
-//  '<S94>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer/Tanh_VSS'
-//  '<S95>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer/Tanh_VSS/None'
-//  '<S96>'  : 'EV_Modeling/BMS/LSTM/lstm_1/ForIteratorSubsystem/OutputMode/OutputMode_sequence'
-//  '<S97>'  : 'EV_Modeling/BMS/LSTM/lstm_1/OutputDataType/SameAsHiddenState'
-//  '<S98>'  : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem'
-//  '<S99>'  : 'EV_Modeling/BMS/LSTM/lstm_2/InputWeightsMatrixMultiply'
-//  '<S100>' : 'EV_Modeling/BMS/LSTM/lstm_2/OutputDataType'
-//  '<S101>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore'
-//  '<S102>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/OutputMode'
-//  '<S103>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f'
-//  '<S104>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i'
-//  '<S105>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o'
-//  '<S106>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/LinearGateAdd'
-//  '<S107>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/RecurrentWeightsMatrixMultiply'
-//  '<S108>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c'
-//  '<S109>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g'
-//  '<S110>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid'
-//  '<S111>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer'
-//  '<S112>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer/Sigmoid_VSS'
-//  '<S113>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
-//  '<S114>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid'
-//  '<S115>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer'
-//  '<S116>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer/Sigmoid_VSS'
-//  '<S117>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
-//  '<S118>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid'
-//  '<S119>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer'
-//  '<S120>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer/Sigmoid_VSS'
-//  '<S121>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
-//  '<S122>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh'
-//  '<S123>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer'
-//  '<S124>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer/Tanh_VSS'
-//  '<S125>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer/Tanh_VSS/None'
-//  '<S126>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh'
-//  '<S127>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer'
-//  '<S128>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer/Tanh_VSS'
-//  '<S129>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer/Tanh_VSS/None'
-//  '<S130>' : 'EV_Modeling/BMS/LSTM/lstm_2/ForIteratorSubsystem/OutputMode/OutputMode_sequence'
-//  '<S131>' : 'EV_Modeling/BMS/LSTM/lstm_2/OutputDataType/SameAsHiddenState'
-//  '<S132>' : 'EV_Modeling/BMS/LV/Drag coefficient1'
-//  '<S133>' : 'EV_Modeling/BMS/PID Controller/Anti-windup'
-//  '<S134>' : 'EV_Modeling/BMS/PID Controller/D Gain'
-//  '<S135>' : 'EV_Modeling/BMS/PID Controller/External Derivative'
-//  '<S136>' : 'EV_Modeling/BMS/PID Controller/Filter'
-//  '<S137>' : 'EV_Modeling/BMS/PID Controller/Filter ICs'
-//  '<S138>' : 'EV_Modeling/BMS/PID Controller/I Gain'
-//  '<S139>' : 'EV_Modeling/BMS/PID Controller/Ideal P Gain'
-//  '<S140>' : 'EV_Modeling/BMS/PID Controller/Ideal P Gain Fdbk'
-//  '<S141>' : 'EV_Modeling/BMS/PID Controller/Integrator'
-//  '<S142>' : 'EV_Modeling/BMS/PID Controller/Integrator ICs'
-//  '<S143>' : 'EV_Modeling/BMS/PID Controller/N Copy'
-//  '<S144>' : 'EV_Modeling/BMS/PID Controller/N Gain'
-//  '<S145>' : 'EV_Modeling/BMS/PID Controller/P Copy'
-//  '<S146>' : 'EV_Modeling/BMS/PID Controller/Parallel P Gain'
-//  '<S147>' : 'EV_Modeling/BMS/PID Controller/Reset Signal'
-//  '<S148>' : 'EV_Modeling/BMS/PID Controller/Saturation'
-//  '<S149>' : 'EV_Modeling/BMS/PID Controller/Saturation Fdbk'
-//  '<S150>' : 'EV_Modeling/BMS/PID Controller/Sum'
-//  '<S151>' : 'EV_Modeling/BMS/PID Controller/Sum Fdbk'
-//  '<S152>' : 'EV_Modeling/BMS/PID Controller/Tracking Mode'
-//  '<S153>' : 'EV_Modeling/BMS/PID Controller/Tracking Mode Sum'
-//  '<S154>' : 'EV_Modeling/BMS/PID Controller/Tsamp - Integral'
-//  '<S155>' : 'EV_Modeling/BMS/PID Controller/Tsamp - Ngain'
-//  '<S156>' : 'EV_Modeling/BMS/PID Controller/postSat Signal'
-//  '<S157>' : 'EV_Modeling/BMS/PID Controller/preInt Signal'
-//  '<S158>' : 'EV_Modeling/BMS/PID Controller/preSat Signal'
-//  '<S159>' : 'EV_Modeling/BMS/PID Controller/Anti-windup/Passthrough'
-//  '<S160>' : 'EV_Modeling/BMS/PID Controller/D Gain/Internal Parameters'
-//  '<S161>' : 'EV_Modeling/BMS/PID Controller/External Derivative/Error'
-//  '<S162>' : 'EV_Modeling/BMS/PID Controller/Filter/Cont. Filter'
-//  '<S163>' : 'EV_Modeling/BMS/PID Controller/Filter ICs/Internal IC - Filter'
-//  '<S164>' : 'EV_Modeling/BMS/PID Controller/I Gain/Internal Parameters'
-//  '<S165>' : 'EV_Modeling/BMS/PID Controller/Ideal P Gain/Passthrough'
-//  '<S166>' : 'EV_Modeling/BMS/PID Controller/Ideal P Gain Fdbk/Disabled'
-//  '<S167>' : 'EV_Modeling/BMS/PID Controller/Integrator/Continuous'
-//  '<S168>' : 'EV_Modeling/BMS/PID Controller/Integrator ICs/Internal IC'
-//  '<S169>' : 'EV_Modeling/BMS/PID Controller/N Copy/Disabled'
-//  '<S170>' : 'EV_Modeling/BMS/PID Controller/N Gain/Internal Parameters'
-//  '<S171>' : 'EV_Modeling/BMS/PID Controller/P Copy/Disabled'
-//  '<S172>' : 'EV_Modeling/BMS/PID Controller/Parallel P Gain/Internal Parameters'
-//  '<S173>' : 'EV_Modeling/BMS/PID Controller/Reset Signal/Disabled'
-//  '<S174>' : 'EV_Modeling/BMS/PID Controller/Saturation/Passthrough'
-//  '<S175>' : 'EV_Modeling/BMS/PID Controller/Saturation Fdbk/Disabled'
-//  '<S176>' : 'EV_Modeling/BMS/PID Controller/Sum/Sum_PID'
-//  '<S177>' : 'EV_Modeling/BMS/PID Controller/Sum Fdbk/Disabled'
-//  '<S178>' : 'EV_Modeling/BMS/PID Controller/Tracking Mode/Disabled'
-//  '<S179>' : 'EV_Modeling/BMS/PID Controller/Tracking Mode Sum/Passthrough'
-//  '<S180>' : 'EV_Modeling/BMS/PID Controller/Tsamp - Integral/TsSignalSpecification'
-//  '<S181>' : 'EV_Modeling/BMS/PID Controller/Tsamp - Ngain/Passthrough'
-//  '<S182>' : 'EV_Modeling/BMS/PID Controller/postSat Signal/Forward_Path'
-//  '<S183>' : 'EV_Modeling/BMS/PID Controller/preInt Signal/Internal PreInt'
-//  '<S184>' : 'EV_Modeling/BMS/PID Controller/preSat Signal/Forward_Path'
+//  '<Root>' : 'EV_Model'
+//  '<S1>'   : 'EV_Model/BMS with LSTM'
+//  '<S2>'   : 'EV_Model/BMS with LSTM/ Normalization'
+//  '<S3>'   : 'EV_Model/BMS with LSTM/Compare To Constant'
+//  '<S4>'   : 'EV_Model/BMS with LSTM/Compare To Constant3'
+//  '<S5>'   : 'EV_Model/BMS with LSTM/Coulomb Counting'
+//  '<S6>'   : 'EV_Model/BMS with LSTM/Drag coefficient for FV'
+//  '<S7>'   : 'EV_Model/BMS with LSTM/Drag coefficient for LV'
+//  '<S8>'   : 'EV_Model/BMS with LSTM/Extended Kalman Filter'
+//  '<S9>'   : 'EV_Model/BMS with LSTM/LSTM'
+//  '<S10>'  : 'EV_Model/BMS with LSTM/Extended Kalman Filter/Correct1'
+//  '<S11>'  : 'EV_Model/BMS with LSTM/Extended Kalman Filter/Output'
+//  '<S12>'  : 'EV_Model/BMS with LSTM/Extended Kalman Filter/Predict'
+//  '<S13>'  : 'EV_Model/BMS with LSTM/Extended Kalman Filter/Output/MATLAB Function'
+//  '<S14>'  : 'EV_Model/BMS with LSTM/LSTM/dropout_1'
+//  '<S15>'  : 'EV_Model/BMS with LSTM/LSTM/dropout_2'
+//  '<S16>'  : 'EV_Model/BMS with LSTM/LSTM/fc'
+//  '<S17>'  : 'EV_Model/BMS with LSTM/LSTM/layer'
+//  '<S18>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1'
+//  '<S19>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2'
+//  '<S20>'  : 'EV_Model/BMS with LSTM/LSTM/fc/BiasAddition'
+//  '<S21>'  : 'EV_Model/BMS with LSTM/LSTM/fc/Reshape'
+//  '<S22>'  : 'EV_Model/BMS with LSTM/LSTM/fc/BiasAddition/AddForEachSeq'
+//  '<S23>'  : 'EV_Model/BMS with LSTM/LSTM/fc/BiasAddition/AddForEachSeq/AddForEachSeq'
+//  '<S24>'  : 'EV_Model/BMS with LSTM/LSTM/fc/Reshape/Noop'
+//  '<S25>'  : 'EV_Model/BMS with LSTM/LSTM/layer/Sigmoid_VSS'
+//  '<S26>'  : 'EV_Model/BMS with LSTM/LSTM/layer/Sigmoid_VSS/None'
+//  '<S27>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem'
+//  '<S28>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/InputWeightsMatrixMultiply'
+//  '<S29>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/OutputDataType'
+//  '<S30>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore'
+//  '<S31>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/OutputMode'
+//  '<S32>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f'
+//  '<S33>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i'
+//  '<S34>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o'
+//  '<S35>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/LinearGateAdd'
+//  '<S36>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/RecurrentWeightsMatrixMultiply'
+//  '<S37>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c'
+//  '<S38>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g'
+//  '<S39>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid'
+//  '<S40>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer'
+//  '<S41>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer/Sigmoid_VSS'
+//  '<S42>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
+//  '<S43>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid'
+//  '<S44>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer'
+//  '<S45>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer/Sigmoid_VSS'
+//  '<S46>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
+//  '<S47>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid'
+//  '<S48>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer'
+//  '<S49>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer/Sigmoid_VSS'
+//  '<S50>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
+//  '<S51>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh'
+//  '<S52>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer'
+//  '<S53>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer/Tanh_VSS'
+//  '<S54>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer/Tanh_VSS/None'
+//  '<S55>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh'
+//  '<S56>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer'
+//  '<S57>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer/Tanh_VSS'
+//  '<S58>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer/Tanh_VSS/None'
+//  '<S59>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/ForIteratorSubsystem/OutputMode/OutputMode_sequence'
+//  '<S60>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_1/OutputDataType/SameAsHiddenState'
+//  '<S61>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem'
+//  '<S62>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/InputWeightsMatrixMultiply'
+//  '<S63>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/OutputDataType'
+//  '<S64>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore'
+//  '<S65>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/OutputMode'
+//  '<S66>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f'
+//  '<S67>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i'
+//  '<S68>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o'
+//  '<S69>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/LinearGateAdd'
+//  '<S70>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/RecurrentWeightsMatrixMultiply'
+//  '<S71>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c'
+//  '<S72>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g'
+//  '<S73>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid'
+//  '<S74>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer'
+//  '<S75>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer/Sigmoid_VSS'
+//  '<S76>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_f/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
+//  '<S77>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid'
+//  '<S78>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer'
+//  '<S79>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer/Sigmoid_VSS'
+//  '<S80>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_i/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
+//  '<S81>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid'
+//  '<S82>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer'
+//  '<S83>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer/Sigmoid_VSS'
+//  '<S84>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/GateActivationFunction_o/sigmoid/Sigmoid Layer/Sigmoid_VSS/None'
+//  '<S85>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh'
+//  '<S86>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer'
+//  '<S87>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer/Tanh_VSS'
+//  '<S88>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_c/tanh/Tanh Layer/Tanh_VSS/None'
+//  '<S89>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh'
+//  '<S90>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer'
+//  '<S91>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer/Tanh_VSS'
+//  '<S92>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/LSTMCore/StateActivationFunction_g/tanh/Tanh Layer/Tanh_VSS/None'
+//  '<S93>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/ForIteratorSubsystem/OutputMode/OutputMode_sequence'
+//  '<S94>'  : 'EV_Model/BMS with LSTM/LSTM/lstm_2/OutputDataType/SameAsHiddenState'
 
 #endif                                 // BMS_h_
 

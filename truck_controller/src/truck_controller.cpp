@@ -893,7 +893,7 @@ void TruckController::compute_control()
             // *changed            
             if(formation_change_flag_ == 3) formation_change_flag_=0;
             //if(formation_change_flag_ == 2 && get_distance_to_leader() < desired_gap_ ) formation_change_flag_=3;
-            if(formation_change_flag_ == 2 && check_stable_speeds() ) formation_change_flag_=3;
+            if(formation_change_flag_ == 2 && check_stable_speeds() ) formation_change_flag_ = 3;
             //if(formation_change_flag_ == 2 && check_stable_speeds() && get_distance_to_leader() < desired_gap_ ) formation_change_flag_=3;            
             std_msgs::msg::Int32 formation_change_flag_msg;
             formation_change_flag_msg.data = formation_change_flag_;

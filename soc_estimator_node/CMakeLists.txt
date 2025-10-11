@@ -10,6 +10,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(ros2_msg REQUIRED)
+find_package(nav_msgs REQUIRED) 
 find_package(geometry_msgs REQUIRED)
 
 # Simulink & ROS2 코드 소스 등록
@@ -35,6 +36,7 @@ ament_target_dependencies(soc_estimator_node_exec
   rclcpp
   std_msgs
   ros2_msg
+  nav_msgs 
   geometry_msgs
 )
 
