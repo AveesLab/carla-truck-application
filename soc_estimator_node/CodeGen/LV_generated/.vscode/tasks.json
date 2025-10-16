@@ -1,0 +1,31 @@
+{
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "C/C++: g++ build active file",
+            "command": "/usr/bin/g++",
+            "args": [
+                "-fdiagnostics-color=always",
+                "-g",
+                "${fileDirname}/ert_main.cpp",
+                "${fileDirname}/LV.cpp",
+                "${fileDirname}/LV_data.cpp",
+                "-I${fileDirname}",    // Include 경로 추가
+                "-o",
+                "${fileDirname}/ert_main"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Build all necessary files including LV classes."
+        }
+    ],
+    "version": "2.0.0"
+}

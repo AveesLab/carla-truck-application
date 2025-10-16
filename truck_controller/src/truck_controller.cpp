@@ -53,8 +53,6 @@ TruckController::TruckController(int argu_id)
   this->declare_parameter<double>("EMERGENCY_GAP");
 
   // 군집 주행 관련 파라미터 선언
-
-
   std::string csv_path;
 
   this->get_parameter("csv_path", csv_path);
@@ -139,9 +137,6 @@ TruckController::TruckController(int argu_id)
         "/truck2/velocity", 10,
         std::bind(&TruckController::truck2_velocity_callback, this, std::placeholders::_1));
 
-
-
-  
   sub_truck0_pos_ = this->create_subscription<geometry_msgs::msg::Point>(
       truck0_topic, 10,
       std::bind(&TruckController::truck0_pos_callback, this, std::placeholders::_1));
@@ -161,7 +156,9 @@ TruckController::TruckController(int argu_id)
   sub_formation_end_change_ = this->create_subscription<std_msgs::msg::Bool>(
       "/lane_change_end_flag", 10,
       std::bind(&TruckController::formation_change_end_callback, this, std::placeholders::_1));
-      
+  sub_formation_command_ = this->create_subscription<ros2_msg::msg::TruckCommand>(
+      ns + "/command", 10,
+      std::bind(&TruckController::formation_command_callback, this, std::placeholders::_1));
   // 200Hz 제어 타이머 추가
   timer_ = this->create_wall_timer(
       std::chrono::milliseconds(10),  // 200Hz = 5ms // 100Hz = 10ms
@@ -241,9 +238,17 @@ void TruckController::formation_change_end_callback(const std_msgs::msg::Bool::S
     //true면 차선변경 끝났다는 뜻 -> check_overrrun 실행
     //false면 차선변경 중이라는 뜻
     if(lane_change_flag_ == true){
-    if(formation_id_ != 0){
-        formation_change_end_flag_ = msg->data;
+        if(formation_id_ != 0){
+            formation_change_end_flag_ = msg->data;
+        }
     }
+}
+
+void TruckController::formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg) {
+    if(msg->lane_change_flag == true)
+    {
+        // *changed
+        lane_change_flag_=true;
     }
 }
 
@@ -472,22 +477,22 @@ void TruckController::compute_control()
         
         check_mission_state_(current_wp_idx_);
         //for lane_change flag test
-        if(deadband_flag_ == true && check_stable_speeds())
-        {
-            // *changed
-            if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
-            // if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
-            // if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
-            if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
-            // if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
-            // if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
-            if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
-            // if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
-            // if(current_wp_idx_ > 16700 && current_wp_idx_<16800) lane_change_flag_=true;
-            // if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
-            // if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
-            // if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
-        }
+        // if(deadband_flag_ == true)
+        // {
+        //     // *changed
+        //     if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
+        //     // if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
+        //     // if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
+        //     if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
+        //     // if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
+        //     // if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
+        //     if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
+        //     // if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
+        //     // if(current_wp_idx_ > 16700 && current_wp_idx_<16800) lane_change_flag_=true;
+        //     // if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
+        //     // if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
+        //     // if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
+        // }
 
 
 
@@ -885,13 +890,10 @@ void TruckController::compute_control()
             // Odometry 발행 및 로깅
             publish_odom(cur_x_, cur_y_, cur_z_, heading);
 
-            // *changed
-
-
-            
+            // *changed            
             if(formation_change_flag_ == 3) formation_change_flag_=0;
             //if(formation_change_flag_ == 2 && get_distance_to_leader() < desired_gap_ ) formation_change_flag_=3;
-            if(formation_change_flag_ == 2 && check_stable_speeds() ) formation_change_flag_=3;
+            if(formation_change_flag_ == 2 && check_stable_speeds() ) formation_change_flag_ = 3;
             //if(formation_change_flag_ == 2 && check_stable_speeds() && get_distance_to_leader() < desired_gap_ ) formation_change_flag_=3;            
             std_msgs::msg::Int32 formation_change_flag_msg;
             formation_change_flag_msg.data = formation_change_flag_;
