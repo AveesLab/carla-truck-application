@@ -20,6 +20,7 @@ def generate_controllers(context):
             emulate_tty=True,
             arguments=[str(i)],
             parameters=[{
+              'use_sim_time': True,
               'csv_path':     csv,
               'curve_lookahead_dist': 10.0,
               'straight_lookahead_dist': 80.0,

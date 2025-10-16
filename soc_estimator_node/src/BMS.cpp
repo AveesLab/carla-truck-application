@@ -7,9 +7,9 @@
 //
 // Code generated for Simulink model 'BMS'.
 //
-// Model version                  : 10.112
+// Model version                  : 10.114
 // Simulink Coder version         : 24.2 (R2024b) 21-Jun-2024
-// C/C++ source code generated on : Thu Oct  9 12:03:10 2025
+// C/C++ source code generated on : Sat Oct 11 21:04:02 2025
 //
 // Target selection: ert.tlc
 // Embedded hardware selection: Intel->x86-64 (Linux 64)
@@ -41,6 +41,9 @@ static double look1_binlag(double u0, const double bp0[], const double table[],
   uint32_t maxIndex);
 static double look2_binlg(double u0, double u1, const double bp0[], const double
   bp1[], const double table[], const uint32_t maxIndex[], uint32_t stride);
+
+// private model entry point functions
+extern void BMS_derivatives();
 extern "C"
 {
   double rtNaN { -std::numeric_limits<double>::quiet_NaN() };
@@ -280,89 +283,180 @@ static double look2_binlg(double u0, double u1, const double bp0[], const double
 }
 
 //
+// This function updates continuous states using the ODE3 fixed-step
+// solver algorithm
+//
+void BMS::rt_ertODEUpdateContinuousStates(RTWSolverInfo *si )
+{
+  // Solver Matrices
+  static const double rt_ODE3_A[3]{
+    1.0/2.0, 3.0/4.0, 1.0
+  };
+
+  static const double rt_ODE3_B[3][3]{
+    { 1.0/2.0, 0.0, 0.0 },
+
+    { 0.0, 3.0/4.0, 0.0 },
+
+    { 2.0/9.0, 1.0/3.0, 4.0/9.0 }
+  };
+
+  double t { rtsiGetT(si) };
+
+  double tnew { rtsiGetSolverStopTime(si) };
+
+  double h { rtsiGetStepSize(si) };
+
+  double *x { rtsiGetContStates(si) };
+
+  ODE3_IntgData *id { static_cast<ODE3_IntgData *>(rtsiGetSolverData(si)) };
+
+  double *y { id->y };
+
+  double *f0 { id->f[0] };
+
+  double *f1 { id->f[1] };
+
+  double *f2 { id->f[2] };
+
+  double hB[3];
+  int i;
+  int nXc { 2 };
+
+  rtsiSetSimTimeStep(si,MINOR_TIME_STEP);
+
+  // Save the state values at time t in y, we'll use x as ynew.
+  (void) std::memcpy(y, x,
+                     static_cast<unsigned int>(nXc)*sizeof(double));
+
+  // Assumes that rtsiSetT and ModelOutputs are up-to-date
+  // f0 = f(t,y)
+  rtsiSetdX(si, f0);
+  BMS_derivatives();
+
+  // f(:,2) = feval(odefile, t + hA(1), y + f*hB(:,1), args(:)(*));
+  hB[0] = h * rt_ODE3_B[0][0];
+  for (i = 0; i < nXc; i++) {
+    x[i] = y[i] + (f0[i]*hB[0]);
+  }
+
+  rtsiSetT(si, t + h*rt_ODE3_A[0]);
+  rtsiSetdX(si, f1);
+  this->step();
+  BMS_derivatives();
+
+  // f(:,3) = feval(odefile, t + hA(2), y + f*hB(:,2), args(:)(*));
+  for (i = 0; i <= 1; i++) {
+    hB[i] = h * rt_ODE3_B[1][i];
+  }
+
+  for (i = 0; i < nXc; i++) {
+    x[i] = y[i] + (f0[i]*hB[0] + f1[i]*hB[1]);
+  }
+
+  rtsiSetT(si, t + h*rt_ODE3_A[1]);
+  rtsiSetdX(si, f2);
+  this->step();
+  BMS_derivatives();
+
+  // tnew = t + hA(3);
+  // ynew = y + f*hB(:,3);
+  for (i = 0; i <= 2; i++) {
+    hB[i] = h * rt_ODE3_B[2][i];
+  }
+
+  for (i = 0; i < nXc; i++) {
+    x[i] = y[i] + (f0[i]*hB[0] + f1[i]*hB[1] + f2[i]*hB[2]);
+  }
+
+  rtsiSetT(si, tnew);
+  rtsiSetSimTimeStep(si,MAJOR_TIME_STEP);
+}
+
+//
 // Output and update for atomic system:
-//    '<S39>/Sigmoid Layer'
-//    '<S43>/Sigmoid Layer'
-//    '<S47>/Sigmoid Layer'
+//    '<S40>/Sigmoid Layer'
+//    '<S44>/Sigmoid Layer'
+//    '<S48>/Sigmoid Layer'
 //
 void BMS::SigmoidLayer(const double rtu_In1[256], double rty_Out1[256])
 {
-  // Product: '<S42>/DivideOut' incorporates:
-  //   Constant: '<S42>/Constant'
-  //   Gain: '<S42>/Gain'
-  //   Math: '<S42>/Exp'
-  //   Sum: '<S42>/Add'
+  // Product: '<S43>/DivideOut' incorporates:
+  //   Constant: '<S43>/Constant'
+  //   Gain: '<S43>/Gain'
+  //   Math: '<S43>/Exp'
+  //   Sum: '<S43>/Add'
   //
-  //  About '<S42>/Exp':
+  //  About '<S43>/Exp':
   //   Operator: exp
 
   for (int32_t i{0}; i < 256; i++) {
     rty_Out1[i] = 1.0 / (std::exp(-rtu_In1[i]) + 1.0);
   }
 
-  // End of Product: '<S42>/DivideOut'
+  // End of Product: '<S43>/DivideOut'
 }
 
 //
 // Output and update for atomic system:
-//    '<S51>/Tanh Layer'
-//    '<S55>/Tanh Layer'
+//    '<S52>/Tanh Layer'
+//    '<S56>/Tanh Layer'
 //
 void BMS::TanhLayer(const double rtu_In1[256], double rty_Out1[256])
 {
-  // Trigonometry: '<S54>/Tanh'
+  // Trigonometry: '<S55>/Tanh'
   for (int32_t i{0}; i < 256; i++) {
     rty_Out1[i] = std::tanh(rtu_In1[i]);
   }
 
-  // End of Trigonometry: '<S54>/Tanh'
+  // End of Trigonometry: '<S55>/Tanh'
 }
 
 //
 // Output and update for atomic system:
-//    '<S73>/Sigmoid Layer'
-//    '<S77>/Sigmoid Layer'
-//    '<S81>/Sigmoid Layer'
+//    '<S74>/Sigmoid Layer'
+//    '<S78>/Sigmoid Layer'
+//    '<S82>/Sigmoid Layer'
 //
 void BMS::SigmoidLayer_n(const double rtu_In1[128], double rty_Out1[128])
 {
-  // Product: '<S76>/DivideOut' incorporates:
-  //   Constant: '<S76>/Constant'
-  //   Gain: '<S76>/Gain'
-  //   Math: '<S76>/Exp'
-  //   Sum: '<S76>/Add'
+  // Product: '<S77>/DivideOut' incorporates:
+  //   Constant: '<S77>/Constant'
+  //   Gain: '<S77>/Gain'
+  //   Math: '<S77>/Exp'
+  //   Sum: '<S77>/Add'
   //
-  //  About '<S76>/Exp':
+  //  About '<S77>/Exp':
   //   Operator: exp
 
   for (int32_t i{0}; i < 128; i++) {
     rty_Out1[i] = 1.0 / (std::exp(-rtu_In1[i]) + 1.0);
   }
 
-  // End of Product: '<S76>/DivideOut'
+  // End of Product: '<S77>/DivideOut'
 }
 
 //
 // Output and update for atomic system:
-//    '<S85>/Tanh Layer'
-//    '<S89>/Tanh Layer'
+//    '<S86>/Tanh Layer'
+//    '<S90>/Tanh Layer'
 //
 void BMS::TanhLayer_m(const double rtu_In1[128], double rty_Out1[128])
 {
-  // Trigonometry: '<S88>/Tanh'
+  // Trigonometry: '<S89>/Tanh'
   for (int32_t i{0}; i < 128; i++) {
     rty_Out1[i] = std::tanh(rtu_In1[i]);
   }
 
-  // End of Trigonometry: '<S88>/Tanh'
+  // End of Trigonometry: '<S89>/Tanh'
 }
 
 double BMS::xnrm2(int32_t n, const double x[2], int32_t ix0)
 {
   double y;
 
-  // Start for MATLABSystem: '<S10>/MATLAB System' incorporates:
-  //   MATLABSystem: '<S12>/MATLAB System'
+  // Start for MATLABSystem: '<S11>/MATLAB System' incorporates:
+  //   MATLABSystem: '<S13>/MATLAB System'
 
   y = 0.0;
   if (n >= 1) {
@@ -388,7 +482,7 @@ double BMS::xnrm2(int32_t n, const double x[2], int32_t ix0)
     }
   }
 
-  // End of Start for MATLABSystem: '<S10>/MATLAB System'
+  // End of Start for MATLABSystem: '<S11>/MATLAB System'
   return y;
 }
 
@@ -415,14 +509,12 @@ double BMS::rt_hypotd_snf_e(double u0, double u1)
 
 double BMS::qrFactor(double A, double S, double Ns)
 {
-  int32_t jA;
-
-  // Start for MATLABSystem: '<S10>/MATLAB System'
+  // Start for MATLABSystem: '<S11>/MATLAB System'
   rtDW.M_c[0] = S * A;
   rtDW.M_c[1] = Ns;
 
-  // Start for MATLABSystem: '<S10>/MATLAB System'
-  for (rtDW.b_i_p = 0; rtDW.b_i_p < 1; rtDW.b_i_p++) {
+  // Start for MATLABSystem: '<S11>/MATLAB System'
+  for (rtDW.b_i_c = 0; rtDW.b_i_c < 1; rtDW.b_i_c++) {
     rtDW.b_atmp = rtDW.M_c[0];
     rtDW.beta1 = xnrm2(1, rtDW.M_c, 2);
     if (rtDW.beta1 != 0.0) {
@@ -432,19 +524,19 @@ double BMS::qrFactor(double A, double S, double Ns)
       }
 
       if (std::abs(rtDW.beta1) < 1.0020841800044864E-292) {
-        rtDW.knt_c = -1;
+        rtDW.knt_f = -1;
         do {
-          rtDW.knt_c++;
-          rtDW.M_b = rtDW.M_c[1];
-          for (jA = 2; jA < 3; jA++) {
-            rtDW.M_b *= 9.9792015476736E+291;
+          rtDW.knt_f++;
+          rtDW.M_p = rtDW.M_c[1];
+          for (rtDW.jA = 2; rtDW.jA < 3; rtDW.jA++) {
+            rtDW.M_p *= 9.9792015476736E+291;
           }
 
-          rtDW.M_c[1] = rtDW.M_b;
+          rtDW.M_c[1] = rtDW.M_p;
           rtDW.beta1 *= 9.9792015476736E+291;
           rtDW.b_atmp *= 9.9792015476736E+291;
         } while ((std::abs(rtDW.beta1) < 1.0020841800044864E-292) &&
-                 ((rtDW.knt_c + 1) < 20));
+                 ((rtDW.knt_f + 1) < 20));
 
         rtDW.beta1 = rt_hypotd_snf_e(rtDW.b_atmp, xnrm2(1, rtDW.M_c, 2));
         if (rtDW.b_atmp >= 0.0) {
@@ -452,24 +544,24 @@ double BMS::qrFactor(double A, double S, double Ns)
         }
 
         rtDW.b_atmp = 1.0 / (rtDW.b_atmp - rtDW.beta1);
-        for (jA = 2; jA < 3; jA++) {
-          rtDW.M_b *= rtDW.b_atmp;
+        for (rtDW.jA = 2; rtDW.jA < 3; rtDW.jA++) {
+          rtDW.M_p *= rtDW.b_atmp;
         }
 
-        rtDW.M_c[1] = rtDW.M_b;
-        for (jA = 0; jA <= rtDW.knt_c; jA++) {
+        rtDW.M_c[1] = rtDW.M_p;
+        for (rtDW.jA = 0; rtDW.jA <= rtDW.knt_f; rtDW.jA++) {
           rtDW.beta1 *= 1.0020841800044864E-292;
         }
 
         rtDW.b_atmp = rtDW.beta1;
       } else {
         rtDW.b_atmp = 1.0 / (rtDW.M_c[0] - rtDW.beta1);
-        rtDW.M_b = rtDW.M_c[1];
-        for (jA = 2; jA < 3; jA++) {
-          rtDW.M_b *= rtDW.b_atmp;
+        rtDW.M_p = rtDW.M_c[1];
+        for (rtDW.jA = 2; rtDW.jA < 3; rtDW.jA++) {
+          rtDW.M_p *= rtDW.b_atmp;
         }
 
-        rtDW.M_c[1] = rtDW.M_b;
+        rtDW.M_c[1] = rtDW.M_p;
         rtDW.b_atmp = rtDW.beta1;
       }
     }
@@ -484,13 +576,13 @@ double BMS::trisolve(double A, double B_0)
 {
   double b_B;
 
-  // Start for MATLABSystem: '<S10>/MATLAB System'
+  // Start for MATLABSystem: '<S11>/MATLAB System'
   b_B = B_0;
   if (B_0 != 0.0) {
     b_B = B_0 / A;
   }
 
-  // End of Start for MATLABSystem: '<S10>/MATLAB System'
+  // End of Start for MATLABSystem: '<S11>/MATLAB System'
   return b_B;
 }
 
@@ -500,22 +592,36 @@ void BMS::step()
   __m128d tmp;
   __m128d tmp_0;
   __m128d tmp_1;
+  bool b;
+  if ((&rtM)->isMajorTimeStep()) {
+    // set solver stop time
+    rtsiSetSolverStopTime(&(&rtM)->solverInfo,(((&rtM)->Timing.clockTick0+1)*
+      (&rtM)->Timing.stepSize0));
+  }                                    // end MajorTimeStep
 
-  // Outputs for Atomic SubSystem: '<Root>/BMS with LSTM'
-  // UnitDelay: '<S1>/SOC_t-2'
-  rtDW.DiscreteTimeIntegrator_d = rtDW.SOC_t2_DSTATE;
+  // Update absolute time of base rate at minor time step
+  if ((&rtM)->isMinorTimeStep()) {
+    (&rtM)->Timing.t[0] = rtsiGetT(&(&rtM)->solverInfo);
+  }
 
-  // Lookup_n-D: '<S1>/SOC-Temp' incorporates:
-  //   DiscreteIntegrator: '<S5>/Discrete-Time Integrator'
+  // Outputs for Atomic SubSystem: '<Root>/BMS'
+  b = ((&rtM)->isMajorTimeStep());
+  if (b) {
+    // UnitDelay: '<S1>/SOC_t-2'
+    rtDW.SpeedDifferent = rtDW.SOC_t2_DSTATE;
 
-  rtDW.SOCTemp = look1_binlg(rtDW.DiscreteTimeIntegrator_d,
-    rtConstP.SOCTemp_bp01Data, rtConstP.SOCTemp_tableData, 3987U);
+    // Lookup_n-D: '<S1>/SOC-Temp' incorporates:
+    //   Sum: '<S1>/Speed Different'
 
-  // Lookup_n-D: '<S1>/SOC-Vol1' incorporates:
-  //   DiscreteIntegrator: '<S5>/Discrete-Time Integrator'
+    rtDW.SOCTemp = look1_binlg(rtDW.SpeedDifferent, rtConstP.SOCTemp_bp01Data,
+      rtConstP.SOCTemp_tableData, 3987U);
 
-  rtDW.Vsoc = look1_binlag(rtDW.DiscreteTimeIntegrator_d,
-    rtConstP.SOCVol1_bp01Data, rtConstP.SOCVol1_tableData, 100U);
+    // Lookup_n-D: '<S1>/SOC-Vol1' incorporates:
+    //   Sum: '<S1>/Speed Different'
+
+    rtDW.Vsoc = look1_binlag(rtDW.SpeedDifferent, rtConstP.SOCVol1_bp01Data,
+      rtConstP.SOCVol1_tableData, 100U);
+  }
 
   // FromWorkspace: '<S1>/From Workspace19'
   {
@@ -528,29 +634,55 @@ void BMS::step()
   //   Constant: '<S1>/Constant8'
 
   rtDW.Add13 = 1.0 - rtDW.F_rolling;
+  if (b) {
+    // Sum: '<S1>/Speed Different' incorporates:
+    //   Gain: '<S1>/Gain1'
+    //   Inport: '<Root>/ego_velocity'
+    //   Inport: '<Root>/target_velocity'
+
+    rtDW.SpeedDifferent = rtU.target_velocity - (3.6 * rtU.ego_velocity);
+
+    // Gain: '<S135>/Proportional Gain'
+    rtDW.ProportionalGain = 100.0 * rtDW.SpeedDifferent;
+
+    // Gain: '<S123>/Derivative Gain'
+    rtDW.DerivativeGain = 0.0001 * rtDW.SpeedDifferent;
+  }
 
   // Switch: '<S1>/Switch1' incorporates:
-  //   Gain: '<S1>/Accel2'
-  //   Inport: '<Root>/velocity_control'
+  //   Integrator: '<S130>/Integrator'
 
-  rtDW.F_rolling = 100.0 * rtU.velocity_control;
+  rtDW.F_rolling = rtX.Integrator_CSTATE;
+
+  // Gain: '<S133>/Filter Coefficient' incorporates:
+  //   Integrator: '<S125>/Filter'
+  //   Sum: '<S125>/SumD'
+
+  rtDW.FilterCoefficient = (rtDW.DerivativeGain - rtX.Filter_CSTATE) * 10.0;
+
+  // Sum: '<S1>/Add14' incorporates:
+  //   Gain: '<S1>/Accel2'
+  //   Sum: '<S139>/Sum'
+
+  rtDW.rtb_Add14_b = (rtDW.ProportionalGain + rtDW.F_rolling +
+                      rtDW.FilterCoefficient) * 100.0;
 
   // Saturate: '<S1>/Brake[%]1'
-  if (rtDW.F_rolling > 0.0) {
-    // Sum: '<S1>/Add14'
-    rtDW.DiscreteTimeIntegrator_d = 0.0;
-  } else if (rtDW.F_rolling < -100.0) {
-    // Sum: '<S1>/Add14'
-    rtDW.DiscreteTimeIntegrator_d = -100.0;
+  if (rtDW.rtb_Add14_b > 0.0) {
+    // Switch: '<S1>/Switch1'
+    rtDW.F_rolling = 0.0;
+  } else if (rtDW.rtb_Add14_b < -100.0) {
+    // Switch: '<S1>/Switch1'
+    rtDW.F_rolling = -100.0;
   } else {
-    // Sum: '<S1>/Add14'
-    rtDW.DiscreteTimeIntegrator_d = rtDW.F_rolling;
+    // Switch: '<S1>/Switch1'
+    rtDW.F_rolling = rtDW.rtb_Add14_b;
   }
 
   // End of Saturate: '<S1>/Brake[%]1'
 
   // Product: '<S1>/Divide25'
-  rtDW.Add13 *= rtDW.DiscreteTimeIntegrator_d;
+  rtDW.Add13 *= rtDW.F_rolling;
 
   // FromWorkspace: '<S1>/From Workspace1'
   {
@@ -560,7 +692,7 @@ void BMS::step()
   }
 
   // Product: '<S1>/Divide2'
-  rtDW.Divide2 = rtDW.DiscreteTimeIntegrator_d * rtDW.uDLookupTable1;
+  rtDW.Divide2 = rtDW.F_rolling * rtDW.uDLookupTable1;
 
   // FromWorkspace: '<S1>/From Workspace21'
   {
@@ -572,11 +704,10 @@ void BMS::step()
   // Product: '<S1>/Divide36' incorporates:
   //   Constant: '<S1>/Constant10'
   //   Constant: '<S1>/Constant9'
-  //   Inport: '<Root>/velocity'
+  //   Inport: '<Root>/ego_velocity'
   //   Product: '<S1>/Divide35'
 
-  rtDW.DiscreteTimeIntegrator_d = rtU.velocity / (6.2831853071795862 *
-    rtDW.uDLookupTable1);
+  rtDW.Divide36 = rtU.ego_velocity / (6.2831853071795862 * rtDW.uDLookupTable1);
 
   // FromWorkspace: '<S1>/From Workspace22'
   {
@@ -589,28 +720,22 @@ void BMS::step()
   //   Gain: '<S1>/Gain20'
   //   Product: '<S1>/Divide37'
 
-  rtDW.uDLookupTable1 = (rtDW.DiscreteTimeIntegrator_d * rtDW.uDLookupTable1) *
-    60.0;
+  rtDW.uDLookupTable1 = (rtDW.Divide36 * rtDW.uDLookupTable1) * 60.0;
 
-  // Sum: '<S1>/Add14' incorporates:
+  // Switch: '<S1>/Switch1' incorporates:
   //   Lookup_n-D: '<S1>/2-D Lookup Table1'
   //   Lookup_n-D: '<S1>/MAX Torque1'
 
-  rtDW.DiscreteTimeIntegrator_d = look1_binlg(rtDW.uDLookupTable1,
-    rtConstP.MAXTorque1_bp01Data, rtConstP.MAXTorque1_tableData, 5U);
-
-  // Product: '<S1>/Divide27' incorporates:
-  //   Gain: '<S1>/Gain13'
-
-  rtDW.Divide2 = (0.01 * rtDW.Divide2) * rtDW.DiscreteTimeIntegrator_d;
+  rtDW.F_rolling = look1_binlg(rtDW.uDLookupTable1, rtConstP.MAXTorque1_bp01Data,
+    rtConstP.MAXTorque1_tableData, 5U);
 
   // Saturate: '<S1>/Accel[%]1'
-  if (rtDW.F_rolling > 100.0) {
-    // Switch: '<S1>/Switch1'
-    rtDW.F_rolling = 100.0;
-  } else if (rtDW.F_rolling < 0.0) {
-    // Switch: '<S1>/Switch1'
-    rtDW.F_rolling = 0.0;
+  if (rtDW.rtb_Add14_b > 100.0) {
+    // Sum: '<S1>/Add14'
+    rtDW.rtb_Add14_b = 100.0;
+  } else if (rtDW.rtb_Add14_b < 0.0) {
+    // Sum: '<S1>/Add14'
+    rtDW.rtb_Add14_b = 0.0;
   }
 
   // End of Saturate: '<S1>/Accel[%]1'
@@ -618,35 +743,35 @@ void BMS::step()
   // Product: '<S1>/Divide1' incorporates:
   //   Gain: '<S1>/Accel1'
 
-  rtDW.Motor_TorqueNm_d = (0.01 * rtDW.F_rolling) *
-    rtDW.DiscreteTimeIntegrator_d;
+  rtDW.Divide36 = (0.01 * rtDW.rtb_Add14_b) * rtDW.F_rolling;
 
   // FromWorkspace: '<S1>/From Workspace18'
   {
     double *pDataValues{ (double *) rtDW.FromWorkspace18_PWORK.DataPtr };
 
-    rtDW.DiscreteTimeIntegrator_d = pDataValues[0];
+    rtDW.rtb_Add14_b = pDataValues[0];
   }
 
   // Product: '<S1>/Divide33' incorporates:
+  //   Gain: '<S1>/Gain13'
+  //   Product: '<S1>/Divide27'
   //   Sum: '<S1>/Add1'
 
-  rtDW.Divide2 = (rtDW.Divide2 + rtDW.Motor_TorqueNm_d) *
-    rtDW.DiscreteTimeIntegrator_d;
+  rtDW.Divide2 = (((0.01 * rtDW.Divide2) * rtDW.F_rolling) + rtDW.Divide36) *
+    rtDW.rtb_Add14_b;
 
   // FromWorkspace: '<S1>/From Workspace20'
   {
     double *pDataValues{ (double *) rtDW.FromWorkspace20_PWORK.DataPtr };
 
-    rtDW.DiscreteTimeIntegrator_d = pDataValues[0];
+    rtDW.rtb_Add14_b = pDataValues[0];
   }
 
   // Sum: '<S1>/Add14' incorporates:
   //   Gain: '<S1>/BPP[%]*MAX_Brake_Force[N]1'
   //   Product: '<S1>/Divide34'
 
-  rtDW.DiscreteTimeIntegrator_d = (100.0 * rtDW.Add13) + (rtDW.Divide2 /
-    rtDW.DiscreteTimeIntegrator_d);
+  rtDW.rtb_Add14_b = (100.0 * rtDW.Add13) + (rtDW.Divide2 / rtDW.rtb_Add14_b);
 
   // FromWorkspace: '<S1>/Rolling_Loss1'
   {
@@ -662,12 +787,16 @@ void BMS::step()
     rtDW.FromWorkspace3 = pDataValues[0];
   }
 
-  // Switch: '<S1>/Switch1' incorporates:
-  //   Constant: '<S4>/Constant'
-  //   Inport: '<Root>/velocity'
-  //   RelationalOperator: '<S4>/Compare'
+  if (b) {
+    // RelationalOperator: '<S4>/Compare' incorporates:
+    //   Constant: '<S4>/Constant'
+    //   Inport: '<Root>/ego_velocity'
 
-  if (rtU.velocity > 1.0) {
+    rtDW.Compare = (rtU.ego_velocity > 1.0);
+  }
+
+  // Switch: '<S1>/Switch1'
+  if (rtDW.Compare) {
     // Switch: '<S1>/Switch1' incorporates:
     //   Inport: '<Root>/Mass_kg'
     //   Product: '<S1>/Divide3'
@@ -690,9 +819,9 @@ void BMS::step()
   }
 
   // Product: '<S1>/Divide22' incorporates:
-  //   Inport: '<Root>/velocity'
+  //   Inport: '<Root>/ego_velocity'
 
-  rtDW.Add13 = rtDW.UnitConversion4 * rtU.velocity;
+  rtDW.Add13 = rtDW.UnitConversion4 * rtU.ego_velocity;
 
   // FromWorkspace: '<S1>/From Workspace4'
   {
@@ -705,19 +834,44 @@ void BMS::step()
   //   Inport: '<Root>/Mass_kg'
 
   rtDW.Divide2 = (rtU.Mass_kg * rtDW.UnitConversion4) * 0.0;
+  if (b) {
+    // Saturate: '<S1>/Saturation2' incorporates:
+    //   Inport: '<Root>/IVD'
 
-  // Saturate: '<S1>/Saturation2' incorporates:
-  //   Inport: '<Root>/IVD'
+    if (rtU.IVD > 100.0) {
+      rtDW.Divide36 = 100.0;
+    } else if (rtU.IVD < 0.0) {
+      rtDW.Divide36 = 0.0;
+    } else {
+      rtDW.Divide36 = rtU.IVD;
+    }
 
-  if (rtU.IVD > 100.0) {
-    rtDW.Motor_TorqueNm_d = 100.0;
-  } else if (rtU.IVD < 0.0) {
-    rtDW.Motor_TorqueNm_d = 0.0;
-  } else {
-    rtDW.Motor_TorqueNm_d = rtU.IVD;
+    // End of Saturate: '<S1>/Saturation2'
+
+    // Switch: '<S1>/Switch5' incorporates:
+    //   Inport: '<Root>/Mode'
+
+    if (rtU.Mode >= 1.0) {
+      // Switch: '<S1>/Switch5' incorporates:
+      //   MATLAB Function: '<S1>/Drag coefficient for FV'
+
+      rtDW.Switch5 = (std::exp((rtDW.Divide36 - 8.0) * -0.068) * -0.4629) +
+        0.6441;
+    } else {
+      // Switch: '<S1>/Switch5' incorporates:
+      //   MATLAB Function: '<S1>/Drag coefficient for LV'
+
+      rtDW.Switch5 = (std::exp((rtDW.Divide36 - 8.0) * -0.1002) * -0.1012) +
+        0.6441;
+    }
+
+    // End of Switch: '<S1>/Switch5'
+
+    // Math: '<S1>/Square1' incorporates:
+    //   Inport: '<Root>/ego_velocity'
+
+    rtDW.Square1 = rtU.ego_velocity * rtU.ego_velocity;
   }
-
-  // End of Saturate: '<S1>/Saturation2'
 
   // FromWorkspace: '<S1>/From Workspace'
   {
@@ -733,26 +887,9 @@ void BMS::step()
     rtDW.Step = pDataValues[0];
   }
 
-  // Switch: '<S1>/Switch5' incorporates:
-  //   Inport: '<Root>/Mode'
-  //   MATLAB Function: '<S1>/Drag coefficient for FV'
-  //   MATLAB Function: '<S1>/Drag coefficient for LV'
-
-  if (rtU.Mode >= 1.0) {
-    rtDW.Motor_TorqueNm_d = (std::exp((rtDW.Motor_TorqueNm_d - 8.0) * -0.068) *
-      -0.4629) + 0.6441;
-  } else {
-    rtDW.Motor_TorqueNm_d = (std::exp((rtDW.Motor_TorqueNm_d - 8.0) * -0.1002) *
-      -0.1012) + 0.6441;
-  }
-
-  // Product: '<S1>/Divide23' incorporates:
-  //   Inport: '<Root>/velocity'
-  //   Math: '<S1>/Square1'
-  //   Switch: '<S1>/Switch5'
-
-  rtDW.Motor_TorqueNm_d = (((rtU.velocity * rtU.velocity) *
-    rtDW.Motor_TorqueNm_d) * rtDW.UnitConversion4) * rtDW.Step;
+  // Product: '<S1>/Divide23'
+  rtDW.Divide36 = ((rtDW.Switch5 * rtDW.Square1) * rtDW.UnitConversion4) *
+    rtDW.Step;
 
   // FromWorkspace: '<S1>/From Workspace15'
   {
@@ -767,7 +904,7 @@ void BMS::step()
   //   Sum: '<S1>/Add15'
 
   rtDW.Add13 = (rtDW.F_rolling + rtDW.Add13 + rtDW.Divide2 + (0.5 *
-    rtDW.Motor_TorqueNm_d) + rtDW.DiscreteTimeIntegrator_d) * rtDW.Step;
+    rtDW.Divide36) + rtDW.rtb_Add14_b) * rtDW.Step;
 
   // FromWorkspace: '<S1>/From Workspace14'
   {
@@ -792,624 +929,633 @@ void BMS::step()
   rtDW.uDLookupTable1 = look2_binlg(rtDW.uDLookupTable1, rtDW.Step,
     rtConstP.uDLookupTable1_bp01Data, rtConstP.uDLookupTable1_bp02Data,
     rtConstP.uDLookupTable1_tableData, rtConstP.uDLookupTable1_maxIndex, 51U);
+  if (b) {
+    // Gain: '<S1>/Vol_pack1' incorporates:
+    //   Lookup_n-D: '<S1>/SOC-Vol1'
+
+    rtDW.Vol_pack1 = 18.0 * rtDW.Vsoc;
+  }
 
   // Gain: '<S1>/Gain17' incorporates:
   //   Gain: '<S1>/Gain23'
-  //   Gain: '<S1>/Vol_pack1'
-  //   Lookup_n-D: '<S1>/SOC-Vol1'
   //   Product: '<S1>/Divide38'
   //   Product: '<S1>/Divide39'
   //   Product: '<S1>/Divide5'
 
   rtDW.Motor_Current_cell = (((rtDW.Step * rtDW.UnitConversion4) / (0.01 *
-    rtDW.uDLookupTable1)) / (18.0 * rtDW.Vsoc)) * 0.055555555555555552;
+    rtDW.uDLookupTable1)) / rtDW.Vol_pack1) * 0.055555555555555552;
 
   // MATLAB Function: '<S1>/ Normalization' incorporates:
   //   Lookup_n-D: '<S1>/SOC-Vol1'
 
-  rtDW.Add13 = rtDW.Motor_Current_cell;
+  rtDW.Add13 = rtDW.SOCTemp;
+  rtDW.Divide2 = rtDW.Vsoc;
+  rtDW.Divide36 = rtDW.Motor_Current_cell;
   if (rtDW.SOCTemp < 19.1) {
-    rtDW.SOCTemp = 19.1;
+    rtDW.Add13 = 19.1;
   } else if (rtDW.SOCTemp > 25.0) {
-    rtDW.SOCTemp = 25.0;
+    rtDW.Add13 = 25.0;
   }
 
   if (rtDW.Vsoc > 4.1679) {
-    rtDW.Vsoc = 4.1679;
+    rtDW.Divide2 = 4.1679;
   }
 
   if (rtDW.Motor_Current_cell < -1.0) {
-    rtDW.Add13 = -1.0;
+    rtDW.Divide36 = -1.0;
   } else if (rtDW.Motor_Current_cell > 7.0) {
-    rtDW.Add13 = 7.0;
+    rtDW.Divide36 = 7.0;
   }
 
   // Outputs for Atomic SubSystem: '<S1>/LSTM'
   // Outputs for Atomic SubSystem: '<S9>/lstm_1'
-  // SignalConversion generated from: '<S28>/MaskMM' incorporates:
+  // SignalConversion generated from: '<S29>/MaskMM' incorporates:
   //   MATLAB Function: '<S1>/ Normalization'
 
-  rtDW.SOCTemp = (rtDW.SOCTemp - 19.1) / 5.8999999999999986;
-  rtDW.Vsoc = (rtDW.Vsoc - 3.1724) / 0.99550000000000027;
-  rtDW.Add13 = (rtDW.Add13 - -1.0) / 8.0;
+  rtDW.Add13 = (rtDW.Add13 - 19.1) / 5.8999999999999986;
+  rtDW.Divide2 = (rtDW.Divide2 - 3.1724) / 0.99550000000000027;
+  rtDW.Divide36 = (rtDW.Divide36 - -1.0) / 8.0;
   for (rtDW.knt = 0; rtDW.knt <= 1022; rtDW.knt += 2) {
-    // Product: '<S28>/W*x' incorporates:
-    //   Constant: '<S28>/InputWeights'
-    //   SignalConversion generated from: '<S28>/MaskMM'
+    // Product: '<S29>/W*x' incorporates:
+    //   Constant: '<S29>/InputWeights'
+    //   SignalConversion generated from: '<S29>/MaskMM'
 
     _mm_storeu_pd(&rtDW.Wx[rtDW.knt], _mm_add_pd(_mm_add_pd(_mm_mul_pd
       (_mm_loadu_pd(&rtConstP.InputWeights_Value[rtDW.knt + 1024]), _mm_set1_pd
-       (rtDW.Vsoc)), _mm_mul_pd(_mm_loadu_pd
-      (&rtConstP.InputWeights_Value[rtDW.knt]), _mm_set1_pd(rtDW.SOCTemp))),
+       (rtDW.Divide2)), _mm_mul_pd(_mm_loadu_pd
+      (&rtConstP.InputWeights_Value[rtDW.knt]), _mm_set1_pd(rtDW.Add13))),
       _mm_mul_pd(_mm_loadu_pd(&rtConstP.InputWeights_Value[rtDW.knt + 2048]),
-                 _mm_set1_pd(rtDW.Add13))));
+                 _mm_set1_pd(rtDW.Divide36))));
   }
 
-  // Outputs for Iterator SubSystem: '<S18>/ForIteratorSubsystem' incorporates:
-  //   ForIterator: '<S27>/ForIterator'
+  if ((&rtM)->isMajorTimeStep()) {
+    // Outputs for Iterator SubSystem: '<S19>/ForIteratorSubsystem' incorporates:
+    //   ForIterator: '<S28>/ForIterator'
 
-  if (rtDW.ProbeDimension_o[1] < 2.147483648E+9) {
-    if (rtDW.ProbeDimension_o[1] >= -2.147483648E+9) {
-      rtDW.b_i = static_cast<int32_t>(rtDW.ProbeDimension_o[1]);
+    if (rtDW.ProbeDimension_o[1] < 2.147483648E+9) {
+      if (rtDW.ProbeDimension_o[1] >= -2.147483648E+9) {
+        rtDW.b_i = static_cast<int32_t>(rtDW.ProbeDimension_o[1]);
+      } else {
+        rtDW.b_i = INT32_MIN;
+      }
     } else {
-      rtDW.b_i = INT32_MIN;
+      rtDW.b_i = INT32_MAX;
     }
-  } else {
-    rtDW.b_i = INT32_MAX;
-  }
 
-  if (rtDW.b_i > 2147483646) {
-    rtDW.b_i = 2147483646;
-  } else if (rtDW.b_i < 0) {
-    rtDW.b_i = 0;
-  }
+    if (rtDW.b_i > 2147483646) {
+      rtDW.b_i = 2147483646;
+    } else if (rtDW.b_i < 0) {
+      rtDW.b_i = 0;
+    }
 
-  rtDW.s27_iter = 1;
-  while (rtDW.s27_iter <= rtDW.b_i) {
-    for (rtDW.knt = 0; rtDW.knt < 256; rtDW.knt++) {
-      // Delay: '<S30>/CellStateDelay'
-      if (rtDW.icLoad_b) {
-        rtDW.CellStateDelay_DSTATE_l[rtDW.knt] = 0.0;
+    rtDW.s28_iter = 1;
+    while (rtDW.s28_iter <= rtDW.b_i) {
+      for (rtDW.knt = 0; rtDW.knt < 256; rtDW.knt++) {
+        // Delay: '<S31>/CellStateDelay'
+        if (rtDW.icLoad_b) {
+          rtDW.CellStateDelay_DSTATE_l[rtDW.knt] = 0.0;
+        }
+
+        // Product: '<S77>/DivideOut' incorporates:
+        //   Delay: '<S31>/CellStateDelay'
+
+        rtDW.DivideOut_f[rtDW.knt] = rtDW.CellStateDelay_DSTATE_l[rtDW.knt];
+
+        // Delay: '<S31>/HiddenStateDelay'
+        if (rtDW.icLoad_h) {
+          rtDW.HiddenStateDelay_DSTATE_i[rtDW.knt] = 0.0;
+        }
+
+        // Trigonometry: '<S89>/Tanh' incorporates:
+        //   Delay: '<S31>/HiddenStateDelay'
+
+        rtDW.rtb_Tanh_k[rtDW.knt] = rtDW.HiddenStateDelay_DSTATE_i[rtDW.knt];
       }
 
-      // Product: '<S76>/DivideOut' incorporates:
-      //   Delay: '<S30>/CellStateDelay'
+      // Sum: '<S36>/Wx+Rh+b' incorporates:
+      //   Constant: '<S36>/Bias'
+      //   Constant: '<S37>/RecurrentWeights'
+      //   Delay: '<S31>/HiddenStateDelay'
+      //   Product: '<S29>/W*x'
+      //   Product: '<S37>/R*h_t-1'
+      //   Selector: '<S28>/Selector1'
+      //   Sum: '<S70>/Wx+Rh+b'
 
-      rtDW.DivideOut_f[rtDW.knt] = rtDW.CellStateDelay_DSTATE_l[rtDW.knt];
+      for (rtDW.knt = 0; rtDW.knt < 1024; rtDW.knt++) {
+        rtDW.Divide36 = 0.0;
+        for (rtDW.i = 0; rtDW.i < 256; rtDW.i++) {
+          rtDW.Divide36 += rtConstP.RecurrentWeights_Value[(rtDW.i << 10) +
+            rtDW.knt] * rtDW.HiddenStateDelay_DSTATE_i[rtDW.i];
+        }
 
-      // Delay: '<S30>/HiddenStateDelay'
-      if (rtDW.icLoad_h) {
-        rtDW.HiddenStateDelay_DSTATE_i[rtDW.knt] = 0.0;
+        rtDW.WxRhb[rtDW.knt] = rtDW.Wx[rtDW.knt] + rtDW.Divide36 +
+          rtConstP.Bias_Value_g[rtDW.knt];
       }
 
-      // Trigonometry: '<S88>/Tanh' incorporates:
-      //   Delay: '<S30>/HiddenStateDelay'
+      // End of Sum: '<S36>/Wx+Rh+b'
 
-      rtDW.rtb_Tanh_k[rtDW.knt] = rtDW.HiddenStateDelay_DSTATE_i[rtDW.knt];
-    }
+      // Outputs for Atomic SubSystem: '<S40>/Sigmoid Layer'
+      // Selector: '<S31>/Selector_f' incorporates:
+      //   Sum: '<S70>/Wx+Rh+b'
 
-    // Sum: '<S35>/Wx+Rh+b' incorporates:
-    //   Constant: '<S35>/Bias'
-    //   Constant: '<S36>/RecurrentWeights'
-    //   Delay: '<S30>/HiddenStateDelay'
-    //   Product: '<S28>/W*x'
-    //   Product: '<S36>/R*h_t-1'
-    //   Selector: '<S27>/Selector1'
-    //   Sum: '<S69>/Wx+Rh+b'
+      SigmoidLayer(&rtDW.WxRhb[256], rtDW.rtb_DivideOut_j_c);
 
-    for (rtDW.knt = 0; rtDW.knt < 1024; rtDW.knt++) {
-      rtDW.Motor_TorqueNm_d = 0.0;
-      for (rtDW.i = 0; rtDW.i < 256; rtDW.i++) {
-        rtDW.Motor_TorqueNm_d += rtConstP.RecurrentWeights_Value[(rtDW.i << 10)
-          + rtDW.knt] * rtDW.HiddenStateDelay_DSTATE_i[rtDW.i];
+      // End of Outputs for SubSystem: '<S40>/Sigmoid Layer'
+
+      // Product: '<S31>/f*c_t-1' incorporates:
+      //   Product: '<S77>/DivideOut'
+      //   Product: '<S85>/DivideOut'
+
+      for (rtDW.knt = 0; rtDW.knt <= 254; rtDW.knt += 2) {
+        tmp_0 = _mm_loadu_pd(&rtDW.DivideOut_f[rtDW.knt]);
+        tmp_1 = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
+        _mm_storeu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt], _mm_mul_pd(tmp_0, tmp_1));
       }
 
-      rtDW.WxRhb[rtDW.knt] = rtDW.Wx[rtDW.knt] + rtDW.Motor_TorqueNm_d +
-        rtConstP.Bias_Value_g[rtDW.knt];
-    }
+      // End of Product: '<S31>/f*c_t-1'
 
-    // End of Sum: '<S35>/Wx+Rh+b'
+      // Outputs for Atomic SubSystem: '<S44>/Sigmoid Layer'
+      // Selector: '<S31>/Selector_i' incorporates:
+      //   Sum: '<S70>/Wx+Rh+b'
 
-    // Outputs for Atomic SubSystem: '<S39>/Sigmoid Layer'
-    // Selector: '<S30>/Selector_f' incorporates:
-    //   Sum: '<S69>/Wx+Rh+b'
+      SigmoidLayer(&rtDW.WxRhb[0], rtDW.rtb_Tanh_k);
 
-    SigmoidLayer(&rtDW.WxRhb[256], rtDW.rtb_DivideOut_j_c);
+      // End of Outputs for SubSystem: '<S44>/Sigmoid Layer'
 
-    // End of Outputs for SubSystem: '<S39>/Sigmoid Layer'
+      // Outputs for Atomic SubSystem: '<S56>/Tanh Layer'
+      // Selector: '<S31>/Selector_g' incorporates:
+      //   Sum: '<S70>/Wx+Rh+b'
 
-    // Product: '<S30>/f*c_t-1' incorporates:
-    //   Product: '<S76>/DivideOut'
-    //   Product: '<S84>/DivideOut'
+      TanhLayer(&rtDW.WxRhb[512], rtDW.DivideOut_f);
 
-    for (rtDW.knt = 0; rtDW.knt <= 254; rtDW.knt += 2) {
-      tmp_0 = _mm_loadu_pd(&rtDW.DivideOut_f[rtDW.knt]);
-      tmp_1 = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
-      _mm_storeu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt], _mm_mul_pd(tmp_0, tmp_1));
-    }
+      // End of Outputs for SubSystem: '<S56>/Tanh Layer'
+      for (rtDW.knt = 0; rtDW.knt <= 254; rtDW.knt += 2) {
+        // Product: '<S31>/i*g' incorporates:
+        //   Product: '<S31>/f*c_t-1'
+        //   Product: '<S77>/DivideOut'
+        //   Sum: '<S31>/CellAdd'
+        //   Trigonometry: '<S89>/Tanh'
 
-    // End of Product: '<S30>/f*c_t-1'
+        tmp_0 = _mm_loadu_pd(&rtDW.rtb_Tanh_k[rtDW.knt]);
+        tmp_1 = _mm_loadu_pd(&rtDW.DivideOut_f[rtDW.knt]);
 
-    // Outputs for Atomic SubSystem: '<S43>/Sigmoid Layer'
-    // Selector: '<S30>/Selector_i' incorporates:
-    //   Sum: '<S69>/Wx+Rh+b'
+        // Sum: '<S31>/CellAdd' incorporates:
+        //   Product: '<S31>/f*c_t-1'
 
-    SigmoidLayer(&rtDW.WxRhb[0], rtDW.rtb_Tanh_k);
+        tmp = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
 
-    // End of Outputs for SubSystem: '<S43>/Sigmoid Layer'
+        // Sum: '<S31>/CellAdd' incorporates:
+        //   Product: '<S31>/f*c_t-1'
+        //   Product: '<S31>/i*g'
 
-    // Outputs for Atomic SubSystem: '<S55>/Tanh Layer'
-    // Selector: '<S30>/Selector_g' incorporates:
-    //   Sum: '<S69>/Wx+Rh+b'
-
-    TanhLayer(&rtDW.WxRhb[512], rtDW.DivideOut_f);
-
-    // End of Outputs for SubSystem: '<S55>/Tanh Layer'
-    for (rtDW.knt = 0; rtDW.knt <= 254; rtDW.knt += 2) {
-      // Product: '<S30>/i*g' incorporates:
-      //   Product: '<S30>/f*c_t-1'
-      //   Product: '<S76>/DivideOut'
-      //   Sum: '<S30>/CellAdd'
-      //   Trigonometry: '<S88>/Tanh'
-
-      tmp_0 = _mm_loadu_pd(&rtDW.rtb_Tanh_k[rtDW.knt]);
-      tmp_1 = _mm_loadu_pd(&rtDW.DivideOut_f[rtDW.knt]);
-
-      // Sum: '<S30>/CellAdd' incorporates:
-      //   Product: '<S30>/f*c_t-1'
-
-      tmp = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
-
-      // Sum: '<S30>/CellAdd' incorporates:
-      //   Product: '<S30>/f*c_t-1'
-      //   Product: '<S30>/i*g'
-
-      _mm_storeu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt], _mm_add_pd(_mm_mul_pd
-        (tmp_0, tmp_1), tmp));
-    }
-
-    // Outputs for Atomic SubSystem: '<S47>/Sigmoid Layer'
-    // Selector: '<S30>/Selector_o' incorporates:
-    //   Sum: '<S69>/Wx+Rh+b'
-
-    SigmoidLayer(&rtDW.WxRhb[768], rtDW.rtb_Tanh_k);
-
-    // End of Outputs for SubSystem: '<S47>/Sigmoid Layer'
-
-    // Outputs for Atomic SubSystem: '<S51>/Tanh Layer'
-    TanhLayer(rtDW.rtb_DivideOut_j_c, rtDW.DivideOut_f);
-
-    // End of Outputs for SubSystem: '<S51>/Tanh Layer'
-
-    // Update for Delay: '<S30>/CellStateDelay'
-    rtDW.icLoad_b = false;
-
-    // Update for Delay: '<S30>/HiddenStateDelay'
-    rtDW.icLoad_h = false;
-    for (rtDW.knt = 0; rtDW.knt <= 254; rtDW.knt += 2) {
-      // Product: '<S30>/HiddenStateProduct' incorporates:
-      //   Product: '<S76>/DivideOut'
-      //   Trigonometry: '<S88>/Tanh'
-
-      tmp_0 = _mm_loadu_pd(&rtDW.DivideOut_f[rtDW.knt]);
-      tmp_1 = _mm_loadu_pd(&rtDW.rtb_Tanh_k[rtDW.knt]);
-      tmp_0 = _mm_mul_pd(tmp_0, tmp_1);
-      _mm_storeu_pd(&rtDW.rtb_Tanh_k[rtDW.knt], tmp_0);
-
-      // Assignment: '<S59>/Assignment' incorporates:
-      //   Product: '<S30>/HiddenStateProduct'
-      //   Product: '<S76>/DivideOut'
-
-      _mm_storeu_pd(&rtDW.Assignment_l[rtDW.knt], tmp_0);
-
-      // Update for Delay: '<S30>/CellStateDelay' incorporates:
-      //   Product: '<S30>/HiddenStateProduct'
-      //   Product: '<S76>/DivideOut'
-      //   Sum: '<S30>/CellAdd'
-
-      tmp_1 = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
-      _mm_storeu_pd(&rtDW.CellStateDelay_DSTATE_l[rtDW.knt], tmp_1);
-
-      // Update for Delay: '<S30>/HiddenStateDelay' incorporates:
-      //   Product: '<S30>/HiddenStateProduct'
-      //   Product: '<S76>/DivideOut'
-
-      _mm_storeu_pd(&rtDW.HiddenStateDelay_DSTATE_i[rtDW.knt], tmp_0);
-    }
-
-    rtDW.s27_iter++;
-  }
-
-  // End of Outputs for SubSystem: '<S18>/ForIteratorSubsystem'
-  // End of Outputs for SubSystem: '<S9>/lstm_1'
-
-  // Outputs for Atomic SubSystem: '<S9>/lstm_2'
-  // Product: '<S62>/W*x' incorporates:
-  //   Assignment: '<S59>/Assignment'
-  //   Constant: '<S62>/InputWeights'
-  //   SignalConversion generated from: '<S14>/In1'
-
-  for (rtDW.knt = 0; rtDW.knt < 512; rtDW.knt++) {
-    // Product: '<S62>/W*x' incorporates:
-    //   Constant: '<S62>/InputWeights'
-
-    rtDW.Add13 = 0.0;
-    for (rtDW.i = 0; rtDW.i < 256; rtDW.i++) {
-      // Outputs for Atomic SubSystem: '<S9>/dropout_1'
-      rtDW.Add13 += rtConstP.InputWeights_Value_g[(rtDW.i << 9) + rtDW.knt] *
-        rtDW.Assignment_l[rtDW.i];
-
-      // End of Outputs for SubSystem: '<S9>/dropout_1'
-    }
-
-    // Product: '<S62>/W*x' incorporates:
-    //   Assignment: '<S59>/Assignment'
-    //   Constant: '<S62>/InputWeights'
-    //   SignalConversion generated from: '<S14>/In1'
-
-    rtDW.Wx_m[rtDW.knt] = rtDW.Add13;
-  }
-
-  // End of Product: '<S62>/W*x'
-
-  // Outputs for Iterator SubSystem: '<S19>/ForIteratorSubsystem' incorporates:
-  //   ForIterator: '<S61>/ForIterator'
-
-  if (rtDW.ProbeDimension[1] < 2.147483648E+9) {
-    if (rtDW.ProbeDimension[1] >= -2.147483648E+9) {
-      rtDW.b_i = static_cast<int32_t>(rtDW.ProbeDimension[1]);
-    } else {
-      rtDW.b_i = INT32_MIN;
-    }
-  } else {
-    rtDW.b_i = INT32_MAX;
-  }
-
-  if (rtDW.b_i > 2147483646) {
-    rtDW.b_i = 2147483646;
-  } else if (rtDW.b_i < 0) {
-    rtDW.b_i = 0;
-  }
-
-  rtDW.s27_iter = 1;
-  while (rtDW.s27_iter <= rtDW.b_i) {
-    for (rtDW.knt = 0; rtDW.knt < 128; rtDW.knt++) {
-      // Delay: '<S64>/CellStateDelay' incorporates:
-      //   Product: '<S84>/DivideOut'
-
-      if (rtDW.icLoad) {
-        rtDW.CellStateDelay_DSTATE[rtDW.knt] = 0.0;
+        _mm_storeu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt], _mm_add_pd(_mm_mul_pd
+          (tmp_0, tmp_1), tmp));
       }
 
-      rtDW.rtb_DivideOut_j_c[rtDW.knt] = rtDW.CellStateDelay_DSTATE[rtDW.knt];
+      // Outputs for Atomic SubSystem: '<S48>/Sigmoid Layer'
+      // Selector: '<S31>/Selector_o' incorporates:
+      //   Sum: '<S70>/Wx+Rh+b'
 
-      // End of Delay: '<S64>/CellStateDelay'
+      SigmoidLayer(&rtDW.WxRhb[768], rtDW.rtb_Tanh_k);
 
-      // Delay: '<S64>/HiddenStateDelay' incorporates:
-      //   Trigonometry: '<S88>/Tanh'
+      // End of Outputs for SubSystem: '<S48>/Sigmoid Layer'
 
-      if (rtDW.icLoad_l) {
-        rtDW.HiddenStateDelay_DSTATE[rtDW.knt] = 0.0;
+      // Outputs for Atomic SubSystem: '<S52>/Tanh Layer'
+      TanhLayer(rtDW.rtb_DivideOut_j_c, rtDW.DivideOut_f);
+
+      // End of Outputs for SubSystem: '<S52>/Tanh Layer'
+
+      // Update for Delay: '<S31>/CellStateDelay'
+      rtDW.icLoad_b = false;
+
+      // Update for Delay: '<S31>/HiddenStateDelay'
+      rtDW.icLoad_h = false;
+      for (rtDW.knt = 0; rtDW.knt <= 254; rtDW.knt += 2) {
+        // Product: '<S31>/HiddenStateProduct' incorporates:
+        //   Product: '<S77>/DivideOut'
+        //   Trigonometry: '<S89>/Tanh'
+
+        tmp_0 = _mm_loadu_pd(&rtDW.DivideOut_f[rtDW.knt]);
+        tmp_1 = _mm_loadu_pd(&rtDW.rtb_Tanh_k[rtDW.knt]);
+        tmp_0 = _mm_mul_pd(tmp_0, tmp_1);
+        _mm_storeu_pd(&rtDW.rtb_Tanh_k[rtDW.knt], tmp_0);
+
+        // Assignment: '<S60>/Assignment' incorporates:
+        //   Product: '<S31>/HiddenStateProduct'
+        //   Product: '<S77>/DivideOut'
+
+        _mm_storeu_pd(&rtDW.Assignment_l[rtDW.knt], tmp_0);
+
+        // Update for Delay: '<S31>/CellStateDelay' incorporates:
+        //   Product: '<S31>/HiddenStateProduct'
+        //   Product: '<S77>/DivideOut'
+        //   Sum: '<S31>/CellAdd'
+
+        tmp_1 = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
+        _mm_storeu_pd(&rtDW.CellStateDelay_DSTATE_l[rtDW.knt], tmp_1);
+
+        // Update for Delay: '<S31>/HiddenStateDelay' incorporates:
+        //   Product: '<S31>/HiddenStateProduct'
+        //   Product: '<S77>/DivideOut'
+
+        _mm_storeu_pd(&rtDW.HiddenStateDelay_DSTATE_i[rtDW.knt], tmp_0);
       }
 
-      rtDW.rtb_Tanh_k[rtDW.knt] = rtDW.HiddenStateDelay_DSTATE[rtDW.knt];
-
-      // End of Delay: '<S64>/HiddenStateDelay'
+      rtDW.s28_iter++;
     }
+
+    // End of Outputs for SubSystem: '<S19>/ForIteratorSubsystem'
+
+    // Outputs for Atomic SubSystem: '<S9>/lstm_2'
+    // Product: '<S63>/W*x' incorporates:
+    //   Assignment: '<S60>/Assignment'
+    //   Constant: '<S63>/InputWeights'
+    //   SignalConversion generated from: '<S15>/In1'
 
     for (rtDW.knt = 0; rtDW.knt < 512; rtDW.knt++) {
-      // Product: '<S70>/R*h_t-1' incorporates:
-      //   Constant: '<S70>/RecurrentWeights'
+      // Product: '<S63>/W*x' incorporates:
+      //   Constant: '<S63>/InputWeights'
 
-      rtDW.Add13 = 0.0;
-      for (rtDW.i = 0; rtDW.i < 128; rtDW.i++) {
-        rtDW.Add13 += rtConstP.RecurrentWeights_Value_b[(rtDW.i << 9) + rtDW.knt]
-          * rtDW.rtb_Tanh_k[rtDW.i];
+      rtDW.Divide36 = 0.0;
+      for (rtDW.i = 0; rtDW.i < 256; rtDW.i++) {
+        // Outputs for Atomic SubSystem: '<S9>/dropout_1'
+        rtDW.Divide36 += rtConstP.InputWeights_Value_g[(rtDW.i << 9) + rtDW.knt]
+          * rtDW.Assignment_l[rtDW.i];
+
+        // End of Outputs for SubSystem: '<S9>/dropout_1'
       }
 
-      // Sum: '<S69>/Wx+Rh+b' incorporates:
-      //   Constant: '<S69>/Bias'
-      //   Product: '<S62>/W*x'
-      //   Product: '<S70>/R*h_t-1'
-      //   Selector: '<S61>/Selector1'
+      // Product: '<S63>/W*x' incorporates:
+      //   Assignment: '<S60>/Assignment'
+      //   Constant: '<S63>/InputWeights'
+      //   SignalConversion generated from: '<S15>/In1'
 
-      rtDW.WxRhb[rtDW.knt] = rtDW.Wx_m[rtDW.knt] + rtDW.Add13 +
-        rtConstP.Bias_Value_f[rtDW.knt];
+      rtDW.Wx_m[rtDW.knt] = rtDW.Divide36;
     }
 
-    // Outputs for Atomic SubSystem: '<S73>/Sigmoid Layer'
-    // Selector: '<S64>/Selector_f' incorporates:
-    //   Product: '<S76>/DivideOut'
+    // End of Product: '<S63>/W*x'
 
-    SigmoidLayer_n(&rtDW.WxRhb[128], &rtDW.DivideOut_f[0]);
+    // Outputs for Iterator SubSystem: '<S20>/ForIteratorSubsystem' incorporates:
+    //   ForIterator: '<S62>/ForIterator'
 
-    // End of Outputs for SubSystem: '<S73>/Sigmoid Layer'
-
-    // Product: '<S64>/f*c_t-1'
-    for (rtDW.knt = 0; rtDW.knt <= 126; rtDW.knt += 2) {
-      tmp_0 = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
-      tmp_1 = _mm_loadu_pd(&rtDW.DivideOut_f[rtDW.knt]);
-      _mm_storeu_pd(&rtDW.fc_t1[rtDW.knt], _mm_mul_pd(tmp_0, tmp_1));
+    if (rtDW.ProbeDimension[1] < 2.147483648E+9) {
+      if (rtDW.ProbeDimension[1] >= -2.147483648E+9) {
+        rtDW.b_i = static_cast<int32_t>(rtDW.ProbeDimension[1]);
+      } else {
+        rtDW.b_i = INT32_MIN;
+      }
+    } else {
+      rtDW.b_i = INT32_MAX;
     }
 
-    // End of Product: '<S64>/f*c_t-1'
-
-    // Outputs for Atomic SubSystem: '<S77>/Sigmoid Layer'
-    // Selector: '<S64>/Selector_i' incorporates:
-    //   Product: '<S84>/DivideOut'
-
-    SigmoidLayer_n(&rtDW.WxRhb[0], &rtDW.rtb_DivideOut_j_c[0]);
-
-    // End of Outputs for SubSystem: '<S77>/Sigmoid Layer'
-
-    // Outputs for Atomic SubSystem: '<S89>/Tanh Layer'
-    // Selector: '<S64>/Selector_g' incorporates:
-    //   Trigonometry: '<S88>/Tanh'
-
-    TanhLayer_m(&rtDW.WxRhb[256], &rtDW.rtb_Tanh_k[0]);
-
-    // End of Outputs for SubSystem: '<S89>/Tanh Layer'
-    for (rtDW.knt = 0; rtDW.knt <= 126; rtDW.knt += 2) {
-      // Product: '<S64>/i*g' incorporates:
-      //   Product: '<S64>/f*c_t-1'
-      //   Sum: '<S64>/CellAdd'
-
-      tmp_0 = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
-      tmp_1 = _mm_loadu_pd(&rtDW.rtb_Tanh_k[rtDW.knt]);
-
-      // Sum: '<S64>/CellAdd' incorporates:
-      //   Product: '<S64>/f*c_t-1'
-
-      tmp = _mm_loadu_pd(&rtDW.fc_t1[rtDW.knt]);
-
-      // Sum: '<S64>/CellAdd' incorporates:
-      //   Product: '<S64>/f*c_t-1'
-      //   Product: '<S64>/i*g'
-
-      _mm_storeu_pd(&rtDW.fc_t1[rtDW.knt], _mm_add_pd(_mm_mul_pd(tmp_0, tmp_1),
-        tmp));
+    if (rtDW.b_i > 2147483646) {
+      rtDW.b_i = 2147483646;
+    } else if (rtDW.b_i < 0) {
+      rtDW.b_i = 0;
     }
 
-    // Outputs for Atomic SubSystem: '<S81>/Sigmoid Layer'
-    // Selector: '<S64>/Selector_o' incorporates:
-    //   Product: '<S84>/DivideOut'
+    rtDW.s28_iter = 1;
+    while (rtDW.s28_iter <= rtDW.b_i) {
+      for (rtDW.knt = 0; rtDW.knt < 128; rtDW.knt++) {
+        // Delay: '<S65>/CellStateDelay' incorporates:
+        //   Product: '<S85>/DivideOut'
 
-    SigmoidLayer_n(&rtDW.WxRhb[384], &rtDW.rtb_DivideOut_j_c[0]);
+        if (rtDW.icLoad) {
+          rtDW.CellStateDelay_DSTATE[rtDW.knt] = 0.0;
+        }
 
-    // End of Outputs for SubSystem: '<S81>/Sigmoid Layer'
+        rtDW.rtb_DivideOut_j_c[rtDW.knt] = rtDW.CellStateDelay_DSTATE[rtDW.knt];
 
-    // Outputs for Atomic SubSystem: '<S85>/Tanh Layer'
-    // Trigonometry: '<S88>/Tanh'
-    TanhLayer_m(rtDW.fc_t1, &rtDW.rtb_Tanh_k[0]);
+        // End of Delay: '<S65>/CellStateDelay'
 
-    // End of Outputs for SubSystem: '<S85>/Tanh Layer'
+        // Delay: '<S65>/HiddenStateDelay' incorporates:
+        //   Trigonometry: '<S89>/Tanh'
 
-    // Update for Delay: '<S64>/CellStateDelay'
-    rtDW.icLoad = false;
+        if (rtDW.icLoad_l) {
+          rtDW.HiddenStateDelay_DSTATE[rtDW.knt] = 0.0;
+        }
 
-    // Update for Delay: '<S64>/HiddenStateDelay'
-    rtDW.icLoad_l = false;
-    for (rtDW.knt = 0; rtDW.knt <= 126; rtDW.knt += 2) {
-      // Product: '<S64>/HiddenStateProduct'
-      tmp_0 = _mm_loadu_pd(&rtDW.rtb_Tanh_k[rtDW.knt]);
-      tmp_1 = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
-      tmp_0 = _mm_mul_pd(tmp_0, tmp_1);
+        rtDW.rtb_Tanh_k[rtDW.knt] = rtDW.HiddenStateDelay_DSTATE[rtDW.knt];
 
-      // Assignment: '<S93>/Assignment' incorporates:
-      //   Product: '<S64>/HiddenStateProduct'
+        // End of Delay: '<S65>/HiddenStateDelay'
+      }
 
-      _mm_storeu_pd(&rtDW.Assignment[rtDW.knt], tmp_0);
+      for (rtDW.knt = 0; rtDW.knt < 512; rtDW.knt++) {
+        // Product: '<S71>/R*h_t-1' incorporates:
+        //   Constant: '<S71>/RecurrentWeights'
 
-      // Update for Delay: '<S64>/CellStateDelay' incorporates:
-      //   Product: '<S64>/HiddenStateProduct'
-      //   Sum: '<S64>/CellAdd'
+        rtDW.Divide36 = 0.0;
+        for (rtDW.i = 0; rtDW.i < 128; rtDW.i++) {
+          rtDW.Divide36 += rtConstP.RecurrentWeights_Value_b[(rtDW.i << 9) +
+            rtDW.knt] * rtDW.rtb_Tanh_k[rtDW.i];
+        }
 
-      tmp_1 = _mm_loadu_pd(&rtDW.fc_t1[rtDW.knt]);
-      _mm_storeu_pd(&rtDW.CellStateDelay_DSTATE[rtDW.knt], tmp_1);
+        // Sum: '<S70>/Wx+Rh+b' incorporates:
+        //   Constant: '<S70>/Bias'
+        //   Product: '<S63>/W*x'
+        //   Product: '<S71>/R*h_t-1'
+        //   Selector: '<S62>/Selector1'
 
-      // Update for Delay: '<S64>/HiddenStateDelay' incorporates:
-      //   Product: '<S64>/HiddenStateProduct'
+        rtDW.WxRhb[rtDW.knt] = rtDW.Wx_m[rtDW.knt] + rtDW.Divide36 +
+          rtConstP.Bias_Value_f[rtDW.knt];
+      }
 
-      _mm_storeu_pd(&rtDW.HiddenStateDelay_DSTATE[rtDW.knt], tmp_0);
+      // Outputs for Atomic SubSystem: '<S74>/Sigmoid Layer'
+      // Selector: '<S65>/Selector_f' incorporates:
+      //   Product: '<S77>/DivideOut'
+
+      SigmoidLayer_n(&rtDW.WxRhb[128], &rtDW.DivideOut_f[0]);
+
+      // End of Outputs for SubSystem: '<S74>/Sigmoid Layer'
+
+      // Product: '<S65>/f*c_t-1'
+      for (rtDW.knt = 0; rtDW.knt <= 126; rtDW.knt += 2) {
+        tmp_0 = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
+        tmp_1 = _mm_loadu_pd(&rtDW.DivideOut_f[rtDW.knt]);
+        _mm_storeu_pd(&rtDW.fc_t1[rtDW.knt], _mm_mul_pd(tmp_0, tmp_1));
+      }
+
+      // End of Product: '<S65>/f*c_t-1'
+
+      // Outputs for Atomic SubSystem: '<S78>/Sigmoid Layer'
+      // Selector: '<S65>/Selector_i' incorporates:
+      //   Product: '<S85>/DivideOut'
+
+      SigmoidLayer_n(&rtDW.WxRhb[0], &rtDW.rtb_DivideOut_j_c[0]);
+
+      // End of Outputs for SubSystem: '<S78>/Sigmoid Layer'
+
+      // Outputs for Atomic SubSystem: '<S90>/Tanh Layer'
+      // Selector: '<S65>/Selector_g' incorporates:
+      //   Trigonometry: '<S89>/Tanh'
+
+      TanhLayer_m(&rtDW.WxRhb[256], &rtDW.rtb_Tanh_k[0]);
+
+      // End of Outputs for SubSystem: '<S90>/Tanh Layer'
+      for (rtDW.knt = 0; rtDW.knt <= 126; rtDW.knt += 2) {
+        // Product: '<S65>/i*g' incorporates:
+        //   Product: '<S65>/f*c_t-1'
+        //   Sum: '<S65>/CellAdd'
+
+        tmp_0 = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
+        tmp_1 = _mm_loadu_pd(&rtDW.rtb_Tanh_k[rtDW.knt]);
+
+        // Sum: '<S65>/CellAdd' incorporates:
+        //   Product: '<S65>/f*c_t-1'
+
+        tmp = _mm_loadu_pd(&rtDW.fc_t1[rtDW.knt]);
+
+        // Sum: '<S65>/CellAdd' incorporates:
+        //   Product: '<S65>/f*c_t-1'
+        //   Product: '<S65>/i*g'
+
+        _mm_storeu_pd(&rtDW.fc_t1[rtDW.knt], _mm_add_pd(_mm_mul_pd(tmp_0, tmp_1),
+          tmp));
+      }
+
+      // Outputs for Atomic SubSystem: '<S82>/Sigmoid Layer'
+      // Selector: '<S65>/Selector_o' incorporates:
+      //   Product: '<S85>/DivideOut'
+
+      SigmoidLayer_n(&rtDW.WxRhb[384], &rtDW.rtb_DivideOut_j_c[0]);
+
+      // End of Outputs for SubSystem: '<S82>/Sigmoid Layer'
+
+      // Outputs for Atomic SubSystem: '<S86>/Tanh Layer'
+      // Trigonometry: '<S89>/Tanh'
+      TanhLayer_m(rtDW.fc_t1, &rtDW.rtb_Tanh_k[0]);
+
+      // End of Outputs for SubSystem: '<S86>/Tanh Layer'
+
+      // Update for Delay: '<S65>/CellStateDelay'
+      rtDW.icLoad = false;
+
+      // Update for Delay: '<S65>/HiddenStateDelay'
+      rtDW.icLoad_l = false;
+      for (rtDW.knt = 0; rtDW.knt <= 126; rtDW.knt += 2) {
+        // Product: '<S65>/HiddenStateProduct'
+        tmp_0 = _mm_loadu_pd(&rtDW.rtb_Tanh_k[rtDW.knt]);
+        tmp_1 = _mm_loadu_pd(&rtDW.rtb_DivideOut_j_c[rtDW.knt]);
+        tmp_0 = _mm_mul_pd(tmp_0, tmp_1);
+
+        // Assignment: '<S94>/Assignment' incorporates:
+        //   Product: '<S65>/HiddenStateProduct'
+
+        _mm_storeu_pd(&rtDW.Assignment[rtDW.knt], tmp_0);
+
+        // Update for Delay: '<S65>/CellStateDelay' incorporates:
+        //   Product: '<S65>/HiddenStateProduct'
+        //   Sum: '<S65>/CellAdd'
+
+        tmp_1 = _mm_loadu_pd(&rtDW.fc_t1[rtDW.knt]);
+        _mm_storeu_pd(&rtDW.CellStateDelay_DSTATE[rtDW.knt], tmp_1);
+
+        // Update for Delay: '<S65>/HiddenStateDelay' incorporates:
+        //   Product: '<S65>/HiddenStateProduct'
+
+        _mm_storeu_pd(&rtDW.HiddenStateDelay_DSTATE[rtDW.knt], tmp_0);
+      }
+
+      rtDW.s28_iter++;
     }
 
-    rtDW.s27_iter++;
+    // End of Outputs for SubSystem: '<S20>/ForIteratorSubsystem'
+    // End of Outputs for SubSystem: '<S9>/lstm_2'
+
+    // Outputs for Atomic SubSystem: '<S9>/fc'
+    // Product: '<S17>/Matrix Multiply' incorporates:
+    //   Assignment: '<S94>/Assignment'
+    //   Constant: '<S17>/Weights'
+    //   SignalConversion generated from: '<S16>/In1'
+
+    rtDW.Add13 = 0.0;
+    for (rtDW.knt = 0; rtDW.knt < 128; rtDW.knt++) {
+      // Outputs for Atomic SubSystem: '<S9>/dropout_2'
+      rtDW.Add13 += rtConstP.Weights_Value[rtDW.knt] * rtDW.Assignment[rtDW.knt];
+
+      // End of Outputs for SubSystem: '<S9>/dropout_2'
+    }
+
+    // Outputs for Iterator SubSystem: '<S23>/AddForEachSeq' incorporates:
+    //   ForEach: '<S24>/For Each'
+
+    for (rtDW.ForEach_itr = 0; rtDW.ForEach_itr < 1; rtDW.ForEach_itr++) {
+      // ForEachSliceAssignment generated from: '<S24>/Out1' incorporates:
+      //   Product: '<S17>/Matrix Multiply'
+      //   Sum: '<S24>/Add'
+
+      rtDW.ImpAsg_InsertedFor_Out1_at_ = rtDW.Add13 - 0.015775660052895546;
+    }
+
+    // End of Outputs for SubSystem: '<S23>/AddForEachSeq'
+    // End of Outputs for SubSystem: '<S9>/fc'
+
+    // Outputs for Enabled SubSystem: '<S8>/Correct1' incorporates:
+    //   EnablePort: '<S11>/Enable'
+
+    // MATLABSystem: '<S11>/MATLAB System' incorporates:
+    //   Constant: '<S8>/R1'
+    //   DataStoreRead: '<S11>/Data Store ReadP'
+    //   DataStoreRead: '<S11>/Data Store ReadX'
+
+    //  ¿¹ÃøµÈ SOC°¡ ±×´ë·Î ³ª°¡µµ·Ï ¼³Á¤
+    rtDW.Add13 = std::fmax(1.4901161193847656E-8, 1.4901161193847656E-8 * std::
+      abs(rtDW.x));
+
+    //  ¿¹ÃøµÈ SOC°¡ ±×´ë·Î ³ª°¡µµ·Ï ¼³Á¤
+    rtDW.Add13 = (rtDW.x + rtDW.Add13 - rtDW.x) / rtDW.Add13;
+
+    //  ¿¹ÃøµÈ SOC°¡ ±×´ë·Î ³ª°¡µµ·Ï ¼³Á¤
+    rtDW.Divide2 = qrFactor(rtDW.Add13, rtDW.P_k, 0.1);
+    rtDW.Divide2 = trisolve(rtDW.Divide2, trisolve(rtDW.Divide2, (rtDW.P_k *
+      rtDW.P_k) * rtDW.Add13));
+
+    // DataStoreWrite: '<S11>/Data Store WriteP' incorporates:
+    //   Constant: '<S8>/R1'
+    //   DataStoreRead: '<S11>/Data Store ReadP'
+    //   MATLABSystem: '<S11>/MATLAB System'
+    //
+    rtDW.P_k = qrFactor((-rtDW.Divide2 * rtDW.Add13) + 1.0, rtDW.P_k,
+                        rtDW.Divide2 * 0.1);
+
+    // Outputs for Atomic SubSystem: '<S9>/layer'
+    // DataStoreWrite: '<S11>/Data Store WriteX' incorporates:
+    //   Constant: '<S27>/Constant'
+    //   DataStoreRead: '<S11>/Data Store ReadX'
+    //   Gain: '<S27>/Gain'
+    //   MATLABSystem: '<S11>/MATLAB System'
+    //   Math: '<S27>/Exp'
+    //   Product: '<S27>/DivideOut'
+    //   Sum: '<S27>/Add'
+    //  *
+    //  About '<S27>/Exp':
+    //   Operator: exp
+
+    rtDW.x += ((1.0 / (std::exp(-rtDW.ImpAsg_InsertedFor_Out1_at_) + 1.0)) -
+               rtDW.x) * rtDW.Divide2;
+
+    // End of Outputs for SubSystem: '<S9>/layer'
+    // End of Outputs for SubSystem: '<S8>/Correct1'
+
+    // Outport: '<Root>/SOC' incorporates:
+    //   DataStoreRead: '<S12>/Data Store Read'
+    //   Gain: '<S1>/Gain5'
+
+    rtY.SOC = 100.0 * rtDW.x;
+
+    // Stop: '<S1>/Stop Simulation' incorporates:
+    //   Constant: '<S3>/Constant'
+    //   Outport: '<Root>/SOC'
+    //   RelationalOperator: '<S3>/Compare'
+
+    if (rtY.SOC <= 20.0) {
+      (&rtM)->setStopRequested(1);
+    }
+
+    // End of Stop: '<S1>/Stop Simulation'
+
+    // Sum: '<S5>/Minus1' incorporates:
+    //   Constant: '<S5>/Constant13'
+    //   Constant: '<S5>/Constant14'
+    //   DiscreteIntegrator: '<S5>/Discrete-Time Integrator'
+    //   Product: '<S5>/Divide10'
+
+    rtDW.Minus1 = 1.0 - (rtDW.DiscreteTimeIntegrator_DSTATE / 180000.0);
+
+    // DiscreteIntegrator: '<S1>/Discrete-Time Integrator'
+    rtDW.DiscreteTimeIntegrator = rtDW.DiscreteTimeIntegrator_DSTATE_f;
+
+    // DiscreteIntegrator: '<S1>/Discrete-Time Integrator1'
+    rtDW.ImpAsg_InsertedFor_Out1_at_ = rtDW.DiscreteTimeIntegrator1_DSTATE;
   }
 
-  // End of Outputs for SubSystem: '<S19>/ForIteratorSubsystem'
-  // End of Outputs for SubSystem: '<S9>/lstm_2'
-
-  // Outputs for Atomic SubSystem: '<S9>/fc'
-  // Product: '<S16>/Matrix Multiply' incorporates:
-  //   Assignment: '<S93>/Assignment'
-  //   Constant: '<S16>/Weights'
-  //   SignalConversion generated from: '<S15>/In1'
-
-  rtDW.Motor_TorqueNm_d = 0.0;
-  for (rtDW.knt = 0; rtDW.knt < 128; rtDW.knt++) {
-    // Outputs for Atomic SubSystem: '<S9>/dropout_2'
-    rtDW.Motor_TorqueNm_d += rtConstP.Weights_Value[rtDW.knt] *
-      rtDW.Assignment[rtDW.knt];
-
-    // End of Outputs for SubSystem: '<S9>/dropout_2'
-  }
-
-  // Outputs for Iterator SubSystem: '<S22>/AddForEachSeq' incorporates:
-  //   ForEach: '<S23>/For Each'
-
-  for (rtDW.ForEach_itr = 0; rtDW.ForEach_itr < 1; rtDW.ForEach_itr++) {
-    // ForEachSliceAssignment generated from: '<S23>/Out1' incorporates:
-    //   Product: '<S16>/Matrix Multiply'
-    //   Sum: '<S23>/Add'
-
-    rtDW.ImpAsg_InsertedFor_Out1_at_ = rtDW.Motor_TorqueNm_d -
-      0.015775660052895546;
-  }
-
-  // End of Outputs for SubSystem: '<S22>/AddForEachSeq'
-  // End of Outputs for SubSystem: '<S9>/fc'
+  // End of Outputs for SubSystem: '<S9>/lstm_1'
   // End of Outputs for SubSystem: '<S1>/LSTM'
-
-  // Outputs for Enabled SubSystem: '<S8>/Correct1' incorporates:
-  //   EnablePort: '<S10>/Enable'
-
-  // MATLABSystem: '<S10>/MATLAB System' incorporates:
-  //   Constant: '<S8>/R1'
-  //   DataStoreRead: '<S10>/Data Store ReadP'
-  //   DataStoreRead: '<S10>/Data Store ReadX'
-
-  //  ¿¹ÃøµÈ SOC°¡ ±×´ë·Î ³ª°¡µµ·Ï ¼³Á¤
-  rtDW.SOCTemp = std::fmax(1.4901161193847656E-8, 1.4901161193847656E-8 * std::
-    abs(rtDW.x));
-
-  //  ¿¹ÃøµÈ SOC°¡ ±×´ë·Î ³ª°¡µµ·Ï ¼³Á¤
-  rtDW.SOCTemp = (rtDW.x + rtDW.SOCTemp - rtDW.x) / rtDW.SOCTemp;
-
-  //  ¿¹ÃøµÈ SOC°¡ ±×´ë·Î ³ª°¡µµ·Ï ¼³Á¤
-  rtDW.Vsoc = qrFactor(rtDW.SOCTemp, rtDW.P_k, 0.1);
-  rtDW.Vsoc = trisolve(rtDW.Vsoc, trisolve(rtDW.Vsoc, (rtDW.P_k * rtDW.P_k) *
-    rtDW.SOCTemp));
-
-  // DataStoreWrite: '<S10>/Data Store WriteP' incorporates:
-  //   Constant: '<S8>/R1'
-  //   DataStoreRead: '<S10>/Data Store ReadP'
-  //   MATLABSystem: '<S10>/MATLAB System'
-  //
-  rtDW.P_k = qrFactor((-rtDW.Vsoc * rtDW.SOCTemp) + 1.0, rtDW.P_k, rtDW.Vsoc *
-                      0.1);
-
-  // Outputs for Atomic SubSystem: '<S1>/LSTM'
-  // Outputs for Atomic SubSystem: '<S9>/layer'
-  // DataStoreWrite: '<S10>/Data Store WriteX' incorporates:
-  //   Constant: '<S26>/Constant'
-  //   DataStoreRead: '<S10>/Data Store ReadX'
-  //   Gain: '<S26>/Gain'
-  //   MATLABSystem: '<S10>/MATLAB System'
-  //   Math: '<S26>/Exp'
-  //   Product: '<S26>/DivideOut'
-  //   Sum: '<S26>/Add'
-  //  *
-  //  About '<S26>/Exp':
-  //   Operator: exp
-
-  rtDW.x += ((1.0 / (std::exp(-rtDW.ImpAsg_InsertedFor_Out1_at_) + 1.0)) -
-             rtDW.x) * rtDW.Vsoc;
-
-  // End of Outputs for SubSystem: '<S9>/layer'
-  // End of Outputs for SubSystem: '<S1>/LSTM'
-  // End of Outputs for SubSystem: '<S8>/Correct1'
-
-  // Outport: '<Root>/SOC' incorporates:
-  //   DataStoreRead: '<S11>/Data Store Read'
-  //   Gain: '<S1>/Gain5'
-
-  rtY.SOC = 100.0 * rtDW.x;
-
-  // Stop: '<S1>/Stop Simulation' incorporates:
-  //   Constant: '<S3>/Constant'
-  //   Outport: '<Root>/SOC'
-  //   RelationalOperator: '<S3>/Compare'
-
-  if (rtY.SOC <= 20.0) {
-    (&rtM)->setStopRequested(1);
-  }
-
-  // End of Stop: '<S1>/Stop Simulation'
-
-  // Sum: '<S5>/Minus1' incorporates:
-  //   Constant: '<S5>/Constant13'
-  //   Constant: '<S5>/Constant14'
-  //   DiscreteIntegrator: '<S5>/Discrete-Time Integrator'
-  //   Product: '<S5>/Divide10'
-
-  rtDW.ImpAsg_InsertedFor_Out1_at_ = 1.0 - (rtDW.DiscreteTimeIntegrator_DSTATE /
-    180000.0);
-
-  // DiscreteIntegrator: '<S1>/Discrete-Time Integrator'
-  rtDW.DiscreteTimeIntegrator = rtDW.DiscreteTimeIntegrator_DSTATE_f;
 
   // Product: '<S1>/Divide15' incorporates:
   //   Inport: '<Root>/Mass_kg'
 
-  rtDW.Veh_acceleartion = rtDW.DiscreteTimeIntegrator_d / rtU.Mass_kg;
+  rtDW.Veh_acceleartion = rtDW.rtb_Add14_b / rtU.Mass_kg;
+  if (b) {
+    // Outputs for Atomic SubSystem: '<S8>/Predict'
+    // MATLABSystem: '<S13>/MATLAB System' incorporates:
+    //   Constant: '<S8>/Q'
+    //   DataStoreRead: '<S13>/Data Store ReadP'
+    //   DataStoreRead: '<S13>/Data Store ReadX'
 
-  // Outputs for Atomic SubSystem: '<S8>/Predict'
-  // MATLABSystem: '<S12>/MATLAB System' incorporates:
-  //   Constant: '<S8>/Q'
-  //   DataStoreRead: '<S12>/Data Store ReadP'
-  //   DataStoreRead: '<S12>/Data Store ReadX'
+    rtDW.M[0] = ((rtDW.Minus1 - rtDW.Minus1) / std::fmax(1.4901161193847656E-8,
+      1.4901161193847656E-8 * std::abs(rtDW.x))) * rtDW.P_k;
+    rtDW.M[1] = 0.022360679774997897;
+    for (rtDW.b_i = 0; rtDW.b_i < 1; rtDW.b_i++) {
+      rtDW.Divide2 = rtDW.M[0];
+      rtDW.Add13 = xnrm2(1, rtDW.M, 2);
+      if (rtDW.Add13 != 0.0) {
+        rtDW.Divide36 = rt_hypotd_snf_e(rtDW.M[0], rtDW.Add13);
+        if (rtDW.M[0] >= 0.0) {
+          rtDW.Divide36 = -rtDW.Divide36;
+        }
 
-  rtDW.M[0] = ((rtDW.ImpAsg_InsertedFor_Out1_at_ -
-                rtDW.ImpAsg_InsertedFor_Out1_at_) / std::fmax
-               (1.4901161193847656E-8, 1.4901161193847656E-8 * std::abs(rtDW.x)))
-    * rtDW.P_k;
-  rtDW.M[1] = 0.022360679774997897;
-  for (rtDW.b_i = 0; rtDW.b_i < 1; rtDW.b_i++) {
-    rtDW.Vsoc = rtDW.M[0];
-    rtDW.DiscreteTimeIntegrator_d = xnrm2(1, rtDW.M, 2);
-    if (rtDW.DiscreteTimeIntegrator_d != 0.0) {
-      rtDW.Add13 = rt_hypotd_snf_e(rtDW.M[0], rtDW.DiscreteTimeIntegrator_d);
-      if (rtDW.M[0] >= 0.0) {
-        rtDW.Add13 = -rtDW.Add13;
-      }
+        if (std::abs(rtDW.Divide36) < 1.0020841800044864E-292) {
+          rtDW.knt = -1;
+          do {
+            rtDW.knt++;
+            rtDW.rtb_Add14_b = rtDW.M[1];
+            for (rtDW.s28_iter = 2; rtDW.s28_iter < 3; rtDW.s28_iter++) {
+              rtDW.rtb_Add14_b *= 9.9792015476736E+291;
+            }
 
-      if (std::abs(rtDW.Add13) < 1.0020841800044864E-292) {
-        rtDW.knt = -1;
-        do {
-          rtDW.knt++;
-          rtDW.DiscreteTimeIntegrator_d = rtDW.M[1];
-          for (rtDW.s27_iter = 2; rtDW.s27_iter < 3; rtDW.s27_iter++) {
-            rtDW.DiscreteTimeIntegrator_d *= 9.9792015476736E+291;
+            rtDW.M[1] = rtDW.rtb_Add14_b;
+            rtDW.Divide36 *= 9.9792015476736E+291;
+            rtDW.Divide2 *= 9.9792015476736E+291;
+          } while ((std::abs(rtDW.Divide36) < 1.0020841800044864E-292) &&
+                   ((rtDW.knt + 1) < 20));
+
+          rtDW.Divide36 = rt_hypotd_snf_e(rtDW.Divide2, xnrm2(1, rtDW.M, 2));
+          if (rtDW.Divide2 >= 0.0) {
+            rtDW.Divide36 = -rtDW.Divide36;
           }
 
-          rtDW.M[1] = rtDW.DiscreteTimeIntegrator_d;
-          rtDW.Add13 *= 9.9792015476736E+291;
-          rtDW.Vsoc *= 9.9792015476736E+291;
-        } while ((std::abs(rtDW.Add13) < 1.0020841800044864E-292) && ((rtDW.knt
-                   + 1) < 20));
+          rtDW.Divide2 = 1.0 / (rtDW.Divide2 - rtDW.Divide36);
+          for (rtDW.s28_iter = 2; rtDW.s28_iter < 3; rtDW.s28_iter++) {
+            rtDW.rtb_Add14_b *= rtDW.Divide2;
+          }
 
-        rtDW.Add13 = rt_hypotd_snf_e(rtDW.Vsoc, xnrm2(1, rtDW.M, 2));
-        if (rtDW.Vsoc >= 0.0) {
-          rtDW.Add13 = -rtDW.Add13;
+          rtDW.M[1] = rtDW.rtb_Add14_b;
+          for (rtDW.s28_iter = 0; rtDW.s28_iter <= rtDW.knt; rtDW.s28_iter++) {
+            rtDW.Divide36 *= 1.0020841800044864E-292;
+          }
+
+          rtDW.Divide2 = rtDW.Divide36;
+        } else {
+          rtDW.Divide2 = 1.0 / (rtDW.M[0] - rtDW.Divide36);
+          rtDW.rtb_Add14_b = rtDW.M[1];
+          for (rtDW.s28_iter = 2; rtDW.s28_iter < 3; rtDW.s28_iter++) {
+            rtDW.rtb_Add14_b *= rtDW.Divide2;
+          }
+
+          rtDW.M[1] = rtDW.rtb_Add14_b;
+          rtDW.Divide2 = rtDW.Divide36;
         }
-
-        rtDW.Vsoc = 1.0 / (rtDW.Vsoc - rtDW.Add13);
-        for (rtDW.s27_iter = 2; rtDW.s27_iter < 3; rtDW.s27_iter++) {
-          rtDW.DiscreteTimeIntegrator_d *= rtDW.Vsoc;
-        }
-
-        rtDW.M[1] = rtDW.DiscreteTimeIntegrator_d;
-        for (rtDW.s27_iter = 0; rtDW.s27_iter <= rtDW.knt; rtDW.s27_iter++) {
-          rtDW.Add13 *= 1.0020841800044864E-292;
-        }
-
-        rtDW.Vsoc = rtDW.Add13;
-      } else {
-        rtDW.Vsoc = 1.0 / (rtDW.M[0] - rtDW.Add13);
-        rtDW.DiscreteTimeIntegrator_d = rtDW.M[1];
-        for (rtDW.s27_iter = 2; rtDW.s27_iter < 3; rtDW.s27_iter++) {
-          rtDW.DiscreteTimeIntegrator_d *= rtDW.Vsoc;
-        }
-
-        rtDW.M[1] = rtDW.DiscreteTimeIntegrator_d;
-        rtDW.Vsoc = rtDW.Add13;
       }
+
+      rtDW.M[0] = rtDW.Divide2;
     }
 
-    rtDW.M[0] = rtDW.Vsoc;
+    // DataStoreWrite: '<S13>/Data Store WriteP' incorporates:
+    //   MATLABSystem: '<S13>/MATLAB System'
+    //
+    rtDW.P_k = rtDW.M[0];
+
+    // DataStoreWrite: '<S13>/Data Store WriteX' incorporates:
+    //   MATLABSystem: '<S13>/MATLAB System'
+    //
+    rtDW.x = rtDW.Minus1;
+
+    // End of Outputs for SubSystem: '<S8>/Predict'
+
+    // Gain: '<S127>/Integral Gain'
+    rtDW.IntegralGain = 0.01 * rtDW.SpeedDifferent;
   }
-
-  // DataStoreWrite: '<S12>/Data Store WriteP' incorporates:
-  //   MATLABSystem: '<S12>/MATLAB System'
-  //
-  rtDW.P_k = rtDW.M[0];
-
-  // DataStoreWrite: '<S12>/Data Store WriteX' incorporates:
-  //   MATLABSystem: '<S12>/MATLAB System'
-  //
-  rtDW.x = rtDW.ImpAsg_InsertedFor_Out1_at_;
-
-  // End of Outputs for SubSystem: '<S8>/Predict'
 
   // Step: '<S1>/Step'
   rtDW.Step = !((&rtM)->Timing.t[0] < 10.0);
@@ -1422,59 +1568,79 @@ void BMS::step()
     rtDW.SOCswitch = rtY.SOC;
   } else {
     // Switch: '<S1>/SOC switch'
-    rtDW.SOCswitch = rtDW.ImpAsg_InsertedFor_Out1_at_;
+    rtDW.SOCswitch = rtDW.Minus1;
   }
 
   // End of Switch: '<S1>/SOC switch'
-  // End of Outputs for SubSystem: '<Root>/BMS with LSTM'
+  // End of Outputs for SubSystem: '<Root>/BMS'
 
   // Outport: '<Root>/Accel[ms2]'
   rtY.Accelms2 = rtDW.Veh_acceleartion;
+  if ((&rtM)->isMajorTimeStep()) {
+    // Outport: '<Root>/Speed[ms]'
+    rtY.Speedms = rtDW.DiscreteTimeIntegrator;
 
-  // Outport: '<Root>/Speed[ms]'
-  rtY.Speedms = rtDW.DiscreteTimeIntegrator;
-
-  // Outputs for Atomic SubSystem: '<Root>/BMS with LSTM'
-  // Outport: '<Root>/Position[m]' incorporates:
-  //   DiscreteIntegrator: '<S1>/Discrete-Time Integrator1'
-
-  rtY.Positionm = rtDW.DiscreteTimeIntegrator1_DSTATE;
-
-  // End of Outputs for SubSystem: '<Root>/BMS with LSTM'
-
-  // Update for Atomic SubSystem: '<Root>/BMS with LSTM'
-  // Update for UnitDelay: '<S1>/SOC_t-2'
-  rtDW.SOC_t2_DSTATE = rtDW.SOCswitch;
-
-  // Update for DiscreteIntegrator: '<S5>/Discrete-Time Integrator'
-  rtDW.DiscreteTimeIntegrator_DSTATE += 0.01 * rtDW.Motor_Current_cell;
-
-  // Update for DiscreteIntegrator: '<S1>/Discrete-Time Integrator'
-  rtDW.DiscreteTimeIntegrator_DSTATE_f += 0.01 * rtDW.Veh_acceleartion;
-
-  // Update for DiscreteIntegrator: '<S1>/Discrete-Time Integrator1'
-  rtDW.DiscreteTimeIntegrator1_DSTATE += 0.01 * rtDW.DiscreteTimeIntegrator;
-
-  // End of Update for SubSystem: '<Root>/BMS with LSTM'
-
-  // Update absolute time for base rate
-  // The "clockTick0" counts the number of times the code of this task has
-  //  been executed. The absolute time is the multiplication of "clockTick0"
-  //  and "Timing.stepSize0". Size of "clockTick0" ensures timer will not
-  //  overflow during the application lifespan selected.
-
-  (&rtM)->Timing.t[0] =
-    ((double)(++(&rtM)->Timing.clockTick0)) * (&rtM)->Timing.stepSize0;
-
-  {
-    // Update absolute timer for sample time: [0.01s, 0.0s]
-    // The "clockTick1" counts the number of times the code of this task has
-    //  been executed. The resolution of this integer timer is 0.01, which is the step size
-    //  of the task. Size of "clockTick1" ensures timer will not overflow during the
-    //  application lifespan selected.
-
-    (&rtM)->Timing.clockTick1++;
+    // Outport: '<Root>/Position[m]'
+    rtY.Positionm = rtDW.ImpAsg_InsertedFor_Out1_at_;
   }
+
+  if ((&rtM)->isMajorTimeStep()) {
+    // Update for Atomic SubSystem: '<Root>/BMS'
+    if ((&rtM)->isMajorTimeStep()) {
+      // Update for UnitDelay: '<S1>/SOC_t-2'
+      rtDW.SOC_t2_DSTATE = rtDW.SOCswitch;
+
+      // Update for DiscreteIntegrator: '<S5>/Discrete-Time Integrator'
+      rtDW.DiscreteTimeIntegrator_DSTATE += 0.01 * rtDW.Motor_Current_cell;
+
+      // Update for DiscreteIntegrator: '<S1>/Discrete-Time Integrator'
+      rtDW.DiscreteTimeIntegrator_DSTATE_f += 0.01 * rtDW.Veh_acceleartion;
+
+      // Update for DiscreteIntegrator: '<S1>/Discrete-Time Integrator1'
+      rtDW.DiscreteTimeIntegrator1_DSTATE += 0.01 * rtDW.DiscreteTimeIntegrator;
+    }
+
+    // End of Update for SubSystem: '<Root>/BMS'
+  }                                    // end MajorTimeStep
+
+  if ((&rtM)->isMajorTimeStep()) {
+    rt_ertODEUpdateContinuousStates(&(&rtM)->solverInfo);
+
+    // Update absolute time for base rate
+    // The "clockTick0" counts the number of times the code of this task has
+    //  been executed. The absolute time is the multiplication of "clockTick0"
+    //  and "Timing.stepSize0". Size of "clockTick0" ensures timer will not
+    //  overflow during the application lifespan selected.
+
+    ++(&rtM)->Timing.clockTick0;
+    (&rtM)->Timing.t[0] = rtsiGetSolverStopTime(&(&rtM)->solverInfo);
+
+    {
+      // Update absolute timer for sample time: [0.01s, 0.0s]
+      // The "clockTick1" counts the number of times the code of this task has
+      //  been executed. The resolution of this integer timer is 0.01, which is the step size
+      //  of the task. Size of "clockTick1" ensures timer will not overflow during the
+      //  application lifespan selected.
+
+      (&rtM)->Timing.clockTick1++;
+    }
+  }                                    // end MajorTimeStep
+}
+
+// Derivatives for root system: '<Root>'
+void BMS::BMS_derivatives()
+{
+  BMS::XDot *_rtXdot;
+  _rtXdot = ((XDot *) (&rtM)->derivs);
+
+  // Derivatives for Atomic SubSystem: '<Root>/BMS'
+  // Derivatives for Integrator: '<S130>/Integrator'
+  _rtXdot->Integrator_CSTATE = rtDW.IntegralGain;
+
+  // Derivatives for Integrator: '<S125>/Filter'
+  _rtXdot->Filter_CSTATE = rtDW.FilterCoefficient;
+
+  // End of Derivatives for SubSystem: '<Root>/BMS'
 }
 
 // Model initialize function
@@ -1486,6 +1652,17 @@ void BMS::initialize()
     rtsiSetSimTimeStepPtr(&(&rtM)->solverInfo, &(&rtM)->Timing.simTimeStep);
     rtsiSetTPtr(&(&rtM)->solverInfo, (&rtM)->getTPtrPtr());
     rtsiSetStepSizePtr(&(&rtM)->solverInfo, &(&rtM)->Timing.stepSize0);
+    rtsiSetdXPtr(&(&rtM)->solverInfo, &(&rtM)->derivs);
+    rtsiSetContStatesPtr(&(&rtM)->solverInfo, (double **) &(&rtM)->contStates);
+    rtsiSetNumContStatesPtr(&(&rtM)->solverInfo, &(&rtM)->Sizes.numContStates);
+    rtsiSetNumPeriodicContStatesPtr(&(&rtM)->solverInfo, &(&rtM)
+      ->Sizes.numPeriodicContStates);
+    rtsiSetPeriodicContStateIndicesPtr(&(&rtM)->solverInfo, &(&rtM)
+      ->periodicContStateIndices);
+    rtsiSetPeriodicContStateRangesPtr(&(&rtM)->solverInfo, &(&rtM)
+      ->periodicContStateRanges);
+    rtsiSetContStateDisabledPtr(&(&rtM)->solverInfo, (bool**) &(&rtM)
+      ->contStateDisabled);
     rtsiSetErrorStatusPtr(&(&rtM)->solverInfo, (&rtM)->getErrorStatusPtr());
     rtsiSetRTModelPtr(&(&rtM)->solverInfo, (&rtM));
   }
@@ -1493,11 +1670,19 @@ void BMS::initialize()
   rtsiSetSimTimeStep(&(&rtM)->solverInfo, MAJOR_TIME_STEP);
   rtsiSetIsMinorTimeStepWithModeChange(&(&rtM)->solverInfo, false);
   rtsiSetIsContModeFrozen(&(&rtM)->solverInfo, false);
-  rtsiSetSolverName(&(&rtM)->solverInfo,"FixedStepDiscrete");
+  (&rtM)->intgData.y = (&rtM)->odeY;
+  (&rtM)->intgData.f[0] = (&rtM)->odeF[0];
+  (&rtM)->intgData.f[1] = (&rtM)->odeF[1];
+  (&rtM)->intgData.f[2] = (&rtM)->odeF[2];
+  (&rtM)->contStates = ((X *) &rtX);
+  (&rtM)->contStateDisabled = ((XDis *) &rtXDis);
+  (&rtM)->Timing.tStart = (0.0);
+  rtsiSetSolverData(&(&rtM)->solverInfo, static_cast<void *>(&(&rtM)->intgData));
+  rtsiSetSolverName(&(&rtM)->solverInfo,"ode3");
   (&rtM)->setTPtr(&(&rtM)->Timing.tArray[0]);
   (&rtM)->Timing.stepSize0 = 0.01;
 
-  // SystemInitialize for Atomic SubSystem: '<Root>/BMS with LSTM'
+  // SystemInitialize for Atomic SubSystem: '<Root>/BMS'
   // Start for FromWorkspace: '<S1>/From Workspace19'
   {
     static double pTimeValues0[]{ 1.0 } ;
@@ -1658,43 +1843,69 @@ void BMS::initialize()
   // Start for DataStoreMemory: '<S8>/DataStoreMemory - x'
   rtDW.x = 1.0;
 
+  // InitializeConditions for Integrator: '<S130>/Integrator'
+  rtX.Integrator_CSTATE = 0.0;
+
+  // InitializeConditions for Integrator: '<S125>/Filter'
+  rtX.Filter_CSTATE = 0.0;
+
   // SystemInitialize for Atomic SubSystem: '<S1>/LSTM'
   // SystemInitialize for Atomic SubSystem: '<S9>/lstm_1'
-  // SystemInitialize for Iterator SubSystem: '<S18>/ForIteratorSubsystem'
-  // Start for Probe: '<S27>/Probe Dimension'
+  // SystemInitialize for Iterator SubSystem: '<S19>/ForIteratorSubsystem'
+  // Start for Probe: '<S28>/Probe Dimension'
   rtDW.ProbeDimension_o[0] = 1024.0;
   rtDW.ProbeDimension_o[1] = 1.0;
 
-  // InitializeConditions for Delay: '<S30>/CellStateDelay'
+  // InitializeConditions for Delay: '<S31>/CellStateDelay'
   rtDW.icLoad_b = true;
 
-  // InitializeConditions for Delay: '<S30>/HiddenStateDelay'
+  // InitializeConditions for Delay: '<S31>/HiddenStateDelay'
   rtDW.icLoad_h = true;
 
-  // End of SystemInitialize for SubSystem: '<S18>/ForIteratorSubsystem'
+  // End of SystemInitialize for SubSystem: '<S19>/ForIteratorSubsystem'
   // End of SystemInitialize for SubSystem: '<S9>/lstm_1'
 
   // SystemInitialize for Atomic SubSystem: '<S9>/lstm_2'
-  // SystemInitialize for Iterator SubSystem: '<S19>/ForIteratorSubsystem'
-  // Start for Probe: '<S61>/Probe Dimension'
+  // SystemInitialize for Iterator SubSystem: '<S20>/ForIteratorSubsystem'
+  // Start for Probe: '<S62>/Probe Dimension'
   rtDW.ProbeDimension[0] = 512.0;
   rtDW.ProbeDimension[1] = 1.0;
 
-  // InitializeConditions for Delay: '<S64>/CellStateDelay'
+  // InitializeConditions for Delay: '<S65>/CellStateDelay'
   rtDW.icLoad = true;
 
-  // InitializeConditions for Delay: '<S64>/HiddenStateDelay'
+  // InitializeConditions for Delay: '<S65>/HiddenStateDelay'
   rtDW.icLoad_l = true;
 
-  // End of SystemInitialize for SubSystem: '<S19>/ForIteratorSubsystem'
+  // End of SystemInitialize for SubSystem: '<S20>/ForIteratorSubsystem'
   // End of SystemInitialize for SubSystem: '<S9>/lstm_2'
   // End of SystemInitialize for SubSystem: '<S1>/LSTM'
-  // End of SystemInitialize for SubSystem: '<Root>/BMS with LSTM'
+  // End of SystemInitialize for SubSystem: '<Root>/BMS'
 }
 
-double** BMS::RT_MODEL::getTPtrPtr()
+BMS::XDis* BMS::RT_MODEL::getContStateDisabled() const
 {
-  return &(Timing.t);
+  return contStateDisabled;
+}
+
+void BMS::RT_MODEL::setContStateDisabled(XDis* aContStateDisabled)
+{
+  contStateDisabled = aContStateDisabled;
+}
+
+const char** BMS::RT_MODEL::getErrorStatusPtr()
+{
+  return &errorStatus;
+}
+
+BMS::X* BMS::RT_MODEL::getContStates() const
+{
+  return contStates;
+}
+
+void BMS::RT_MODEL::setContStates(X* aContStates)
+{
+  contStates = aContStates;
 }
 
 bool BMS::RT_MODEL::getStopRequested() const
@@ -1707,6 +1918,26 @@ void BMS::RT_MODEL::setStopRequested(bool aStopRequested)
   (Timing.stopRequestedFlag = aStopRequested);
 }
 
+ODE3_IntgData BMS::RT_MODEL::getIntgData() const
+{
+  return intgData;
+}
+
+void BMS::RT_MODEL::setIntgData(ODE3_IntgData aIntgData)
+{
+  intgData = aIntgData;
+}
+
+bool BMS::RT_MODEL::getDerivCacheNeedsReset() const
+{
+  return derivCacheNeedsReset;
+}
+
+void BMS::RT_MODEL::setDerivCacheNeedsReset(bool aDerivCacheNeedsReset)
+{
+  derivCacheNeedsReset = aDerivCacheNeedsReset;
+}
+
 const char* BMS::RT_MODEL::getErrorStatus() const
 {
   return (errorStatus);
@@ -1715,6 +1946,48 @@ const char* BMS::RT_MODEL::getErrorStatus() const
 void BMS::RT_MODEL::setErrorStatus(const char* const aErrorStatus)
 {
   (errorStatus = aErrorStatus);
+}
+
+bool BMS::RT_MODEL::getContTimeOutputInconsistentWithStateAtMajorStepFlag()
+  const
+{
+  return CTOutputIncnstWithState;
+}
+
+void BMS::RT_MODEL::setContTimeOutputInconsistentWithStateAtMajorStepFlag(bool
+  aContTimeOutputInconsistentWithStateAtMajorStepFlag)
+{
+  CTOutputIncnstWithState = aContTimeOutputInconsistentWithStateAtMajorStepFlag;
+}
+
+bool BMS::RT_MODEL::isMajorTimeStep() const
+{
+  return ((Timing.simTimeStep) == MAJOR_TIME_STEP);
+}
+
+const BMS::odeFSubArray* BMS::RT_MODEL::getOdeF() const
+{
+  return odeF;
+}
+
+bool BMS::RT_MODEL::isMinorTimeStep() const
+{
+  return ((Timing.simTimeStep) == MINOR_TIME_STEP);
+}
+
+const double* BMS::RT_MODEL::getOdeY() const
+{
+  return odeY;
+}
+
+int* BMS::RT_MODEL::getPeriodicContStateIndices() const
+{
+  return periodicContStateIndices;
+}
+
+void BMS::RT_MODEL::setPeriodicContStateIndices(int* aPeriodicContStateIndices)
+{
+  periodicContStateIndices = aPeriodicContStateIndices;
 }
 
 double* BMS::RT_MODEL::getTPtr() const
@@ -1727,24 +2000,49 @@ void BMS::RT_MODEL::setTPtr(double* aTPtr)
   (Timing.t = aTPtr);
 }
 
+double* BMS::RT_MODEL::getPeriodicContStateRanges() const
+{
+  return periodicContStateRanges;
+}
+
+void BMS::RT_MODEL::setPeriodicContStateRanges(double* aPeriodicContStateRanges)
+{
+  periodicContStateRanges = aPeriodicContStateRanges;
+}
+
 bool* BMS::RT_MODEL::getStopRequestedPtr()
 {
   return (&(Timing.stopRequestedFlag));
 }
 
-const char** BMS::RT_MODEL::getErrorStatusPtr()
+double** BMS::RT_MODEL::getTPtrPtr()
 {
-  return &errorStatus;
+  return &(Timing.t);
 }
 
-bool BMS::RT_MODEL::isMajorTimeStep() const
+double BMS::RT_MODEL::getTStart() const
 {
-  return ((Timing.simTimeStep) == MAJOR_TIME_STEP);
+  return (Timing.tStart);
 }
 
-bool BMS::RT_MODEL::isMinorTimeStep() const
+bool BMS::RT_MODEL::getZCCacheNeedsReset() const
 {
-  return ((Timing.simTimeStep) == MINOR_TIME_STEP);
+  return zCCacheNeedsReset;
+}
+
+void BMS::RT_MODEL::setZCCacheNeedsReset(bool aZCCacheNeedsReset)
+{
+  zCCacheNeedsReset = aZCCacheNeedsReset;
+}
+
+double* BMS::RT_MODEL::getdX() const
+{
+  return derivs;
+}
+
+void BMS::RT_MODEL::setdX(double* adX)
+{
+  derivs = adX;
 }
 
 // Constructor
@@ -1752,6 +2050,8 @@ BMS::BMS() :
   rtU(),
   rtY(),
   rtDW(),
+  rtX(),
+  rtXDis(),
   rtM()
 {
   // Currently there is no constructor body generated.

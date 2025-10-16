@@ -10,6 +10,7 @@
 #include <shared_carlalib.h>
 #include <rclcpp/qos.hpp>
 #include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/u_int32.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
 #include <sys/mman.h>
@@ -61,6 +62,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr LC0Pub_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr LC1Pub_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr LC2Pub_;
+    rclcpp::Publisher<std_msgs::msg::UInt32>::SharedPtr FramePub_;
     size_t callback_id;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr TruckSizeSubscriber_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr RegistrationSubscriber_;
