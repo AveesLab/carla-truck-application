@@ -45,13 +45,13 @@ include(dependency.cmake)
 
 add_executable(main
     src/main.cpp
-    nodes/Spectator.cpp
-    nodes/Camera.cpp
-    nodes/Radar.cpp
-    nodes/Lidar.cpp
+    #nodes/Spectator.cpp
+    #nodes/Camera.cpp
+    #nodes/Radar.cpp
+    #nodes/Lidar.cpp
     nodes/TruckControl.cpp
     nodes/TruckStatus.cpp
-    nodes/TruckOBU.cpp
+    #nodes/TruckOBU.cpp
 )
 
 ##############################################################################################

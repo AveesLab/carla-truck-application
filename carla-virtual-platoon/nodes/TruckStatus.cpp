@@ -9,12 +9,12 @@ TruckStatusPublisher::TruckStatusPublisher(boost::shared_ptr<carla::client::Vehi
     this->actor_ = actor;
     rclcpp::QoS qos(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_sensor_data));
 
-    AccelPublisher_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("accel",1);
+    AccelPublisher_ = this->create_publisher<std_msgs::msg::Float32MultiArray>("accelation",1);
     VelocityPublisher_ = this->create_publisher<std_msgs::msg::Float32>(info_topic_name,1);
     ShutdownSubscriber = this->create_subscription<std_msgs::msg::String>("/shutdown_topic", 10, std::bind(&TruckStatusPublisher::shutdown_callback, this, std::placeholders::_1));
-    DistanceSubscriber_ = this->create_subscription<std_msgs::msg::Float32>("min_distance", 10, std::bind(&TruckStatusPublisher::DistanceSubCallback, this, std::placeholders::_1));
-    CutinFlagSubscriber_ = this->create_subscription<std_msgs::msg::Bool>("cut_in_flag", 10, std::bind(&TruckStatusPublisher::CutinFlagSubCallback, this, std::placeholders::_1));
-    SotifSubscriber_ = this->create_subscription<std_msgs::msg::Bool>("front_camera/attribute", 10, std::bind(&TruckStatusPublisher::SotifSubCallback, this, std::placeholders::_1));
+    //DistanceSubscriber_ = this->create_subscription<std_msgs::msg::Float32>("min_distance", 10, std::bind(&TruckStatusPublisher::DistanceSubCallback, this, std::placeholders::_1));
+    //CutinFlagSubscriber_ = this->create_subscription<std_msgs::msg::Bool>("cut_in_flag", 10, std::bind(&TruckStatusPublisher::CutinFlagSubCallback, this, std::placeholders::_1));
+    //SotifSubscriber_ = this->create_subscription<std_msgs::msg::Bool>("front_camera/attribute", 10, std::bind(&TruckStatusPublisher::SotifSubCallback, this, std::placeholders::_1));
     gettimeofday(&init_, NULL);
     //timer_100ms_record = this->create_wall_timer(100ms, std::bind(&TruckStatusPublisher::TruckStatus_record_callback, this));
     this->trucknum_ = trucknum_;
