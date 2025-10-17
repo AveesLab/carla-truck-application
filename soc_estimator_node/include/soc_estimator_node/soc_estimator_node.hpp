@@ -44,7 +44,7 @@ private:
     //rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr brake_pub_;
 
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr speed_sub_;
-    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr control_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr reference_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr ego_sub_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr target_sub_;
 
@@ -53,7 +53,7 @@ private:
 
     rclcpp::TimerBase::SharedPtr timer_;
    	rclcpp::Time last_sim_time_;
-	const double step_interval_sec_ = 0.1;
+	const double step_interval_sec_ = 0.01;
 
     // Formation 변경 측정용
     geometry_msgs::msg::Point pos_at_change_start_;
@@ -66,12 +66,15 @@ private:
     geometry_msgs::msg::Point target_pos;
 
     double current_speed_ = 0.0;
-    double throttle_control_ = 0.0; 
+    double reference_velocity_ = 0.0; 
     double last_soc_= 100.0;
-    double last_pos_= 0.0;
-    double last_vel_= 0.0;
+    //double last_pos_= 0.0;
+    //double last_vel_= 0.0;
     bool mode_changed_ = false;
     rclcpp::Time start_time_;
+    geometry_msgs::msg::Point last_pos_;
+	double total_distance_m_ = 0.0;
+	bool has_prev_pos_ = false;
 
     geometry_msgs::msg::Point pos_at_baseline_start_;
     double soc_at_baseline_start_ = 0.0;

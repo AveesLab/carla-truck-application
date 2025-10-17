@@ -11,8 +11,8 @@ TruckControl::TruckControl(boost::shared_ptr<carla::client::Vehicle> vehicle_, i
     this->get_parameter_or("carla/sync_with_delay",sync_with_delay,false);
     rclcpp::QoS custom_qos(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
     custom_qos.reliable();
-    if(sync_ || sync_with_delay) SyncThrottlePublisher_ = this->create_publisher<std_msgs::msg::Int32>("/sync_throttle",10);
-    if(sync_ || sync_with_delay) SyncSteerPublisher_ = this->create_publisher<std_msgs::msg::Int32>("/sync_steer",10);
+    SyncThrottlePublisher_ = this->create_publisher<std_msgs::msg::Int32>("/sync_throttle",10);
+    SyncSteerPublisher_ = this->create_publisher<std_msgs::msg::Int32>("/sync_steer",10);
     SteerSubscriber_ = this->create_subscription<std_msgs::msg::Float32>(steer_topic_name, custom_qos, std::bind(&TruckControl::SteerSubCallback, this, std::placeholders::_1));
     VelocitySubscriber_ = this->create_subscription<std_msgs::msg::Float64>(velocity_topic_name, custom_qos, std::bind(&TruckControl::VelocitySubCallback, this, std::placeholders::_1));
     
@@ -23,24 +23,24 @@ TruckControl::TruckControl(boost::shared_ptr<carla::client::Vehicle> vehicle_, i
 }
 
 
-void TruckControl::SteerSubCallback(const std_msgs::msg::Float32::SharedPtr msg) {
+void TruckControl::SteerSubCallback(const std_msgs::msg::Float32::SharedPtr msg) 
+{
     float control_value = ((msg->data * -1.0) / 140) * 2 ;
     if (control_value > 1.0) this->control.steer = 1.0f;
     else if (control_value < -1.0) this->control.steer = -1.0f;
     else this->control.steer = control_value;
     //RCLCPP_INFO(this->get_logger(), "throttle pub ");
     Vehicle_->ApplyControl(control);
-       // world->Tick(time_);
-    if(sync_ || sync_with_delay) {
-        std_msgs::msg::Int32 msg;
-        msg.data = this->trucknum;
-        SyncSteerPublisher_->publish(msg);
-        //std::cout << "sync pub" << std::endl;     
-    }
+
+    std_msgs::msg::Int32 index;
+    index.data = this->trucknum;
+    SyncSteerPublisher_->publish(index);
+    //std::cout << "sync pub" << std::endl;     
 }
 
 
-void TruckControl::VelocitySubCallback(const std_msgs::msg::Float64::SharedPtr msg) {
+void TruckControl::VelocitySubCallback(const std_msgs::msg::Float64::SharedPtr msg) 
+{
     double control_value = msg->data;
     if (control_value >= 0) {
         this->control.throttle = control_value;
@@ -62,10 +62,10 @@ void TruckControl::VelocitySubCallback(const std_msgs::msg::Float64::SharedPtr m
     }
    //RCLCPP_INFO(this->get_logger(), "conttrol pub %lf",control_value);
     Vehicle_->ApplyControl(control);
-    if(sync_ || sync_with_delay) {
-        std_msgs::msg::Int32 msg;
-        msg.data = this->trucknum;
-        SyncThrottlePublisher_->publish(msg);
-    }
+
+    std_msgs::msg::Int32 index;
+    index.data = this->trucknum;
+    SyncThrottlePublisher_->publish(index);
+
 }
 

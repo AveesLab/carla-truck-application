@@ -12,6 +12,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.executors import SingleThreadedExecutor
 from std_msgs.msg import Int32
+from rosgraph_msgs.msg import Clock
 
 
 def ensure_dir(path: str):
@@ -23,74 +24,43 @@ def speed_of(v):  # carla.Vector3D -> float (m/s)
 
 
 class TruckCSVLogger(Node):
-    """
-    CARLA vehicle actor로부터 10Hz로
-    timestamp(s), x, y, velocity(m/s), pitch(deg), formation_change 를 CSV로 기록
-    """
     def __init__(self, vehicle_actor: carla.Actor, truck_index_zero_based: int, save_dir: str, namespace: str):
-        # ROS2 네임스페이스: truck0/truck1/...
         super().__init__('truck_csv_logger', namespace=namespace)
 
         self.vehicle = vehicle_actor
-        self.timer_period = 0.1  # 10 Hz
-        self.timer = self.create_timer(self.timer_period, self._on_timer)
+        self.csv_logging_started = False
+        self.formation_change_value = 0
 
-        # Formation change 상태 추적
-        self.formation_change_active = False
-        self.csv_logging_started = False  # CSV 기록 시작 플래그
-        self.formation_change_value = 0  # 수신받은 formation_change 값
-        # 각 트럭의 네임스페이스별 토픽 구독
+        # Formation change 수신 (기존 그대로)
         formation_topic = f'/{namespace}/formation_change'
         self.formation_change_subscriber = self.create_subscription(
-            Int32,
-            formation_topic,
-            self._on_formation_change,
-            10
+            Int32, formation_topic, self._on_formation_change, 10
         )
 
-        # 파일명: 0_truck.csv, 1_truck.csv, 2_truck.csv (truck0 -> 0, truck1 -> 1, truck2 -> 2)
+        # ✅ /clock 구독 추가
+        self.clock_sub = self.create_subscription(Clock, '/clock', self._on_clock, 10)
+
         ensure_dir(save_dir)
         self.csv_path = os.path.join(save_dir, f"{truck_index_zero_based}_truck.csv")
-
-        # CSV 오픈 및 헤더 작성
         self._file = open(self.csv_path, mode='w', newline='', encoding='utf-8')
         self._writer = csv.writer(self._file)
         self._writer.writerow(['timestamp', 'x', 'y', 'velocity', 'pitch', 'formation_change'])
         self._file.flush()
 
-        self.get_logger().info(
-            f"[{self.get_namespace()}] CSV file prepared -> {self.csv_path} (vehicle ID {self.vehicle.id})"
-        )
-        self.get_logger().info(
-            f"[{self.get_namespace()}] Waiting for {formation_topic} signal to start logging..."
-        )
-
-    def _now_sec(self) -> float:
-        # ROS 시계(시뮬레이션 시간 포함) 사용. 필요 시 실제 시간은 time.time()
-        return self.get_clock().now().nanoseconds * 1e-9
+        self.get_logger().info(f"[{self.get_namespace()}] CSV ready -> {self.csv_path}")
 
     def _on_formation_change(self, msg: Int32):
-        """Formation change 메시지를 받으면 플래그 설정 및 CSV 기록 시작"""
-        # 수신받은 값 저장
         self.formation_change_value = msg.data
-        
-        # 첫 번째 메시지를 받으면 CSV 기록 시작
         if not self.csv_logging_started:
             self.csv_logging_started = True
-            self.get_logger().info(f"[{self.get_namespace()}] CSV logging started after receiving formation_change signal!")
-        
+            self.get_logger().info(f"[{self.get_namespace()}] CSV logging started!")
 
-
-    def _on_timer(self):
-        # CSV 기록이 시작되지 않았으면 리턴
+    # ✅ /clock 콜백: 시뮬레이션 tick마다 호출
+    def _on_clock(self, msg: Clock):
         if not self.csv_logging_started:
             return
-            
-        if not self.vehicle or not self.vehicle.is_alive:
-            self.get_logger().warn(
-                f"[{self.get_namespace()}] Vehicle (ID: {self.vehicle.id if self.vehicle else 'N/A'}) not alive. Skip."
-            )
-            return
+
+        sim_time = msg.clock.sec + msg.clock.nanosec * 1e-9
 
         try:
             tf = self.vehicle.get_transform()
@@ -98,19 +68,19 @@ class TruckCSVLogger(Node):
             rot = tf.rotation
             vel = self.vehicle.get_velocity()
 
-            ts = f"{self._now_sec():.9f}"          # 초 단위, 나노초 정밀도 문자열
-            x = loc.x
-            y = loc.y
-            spd = speed_of(vel)                    # m/s
-            pitch = rot.pitch                      # deg
-            formation_flag = self.formation_change_value  # 수신받은 formation_change 값
+            x, y = loc.x, loc.y
+            spd = speed_of(vel)
+            pitch = rot.pitch
+            formation_flag = self.formation_change_value
 
-            self._writer.writerow([ts, f"{x:.6f}", f"{y:.6f}", f"{spd:.6f}", f"{pitch:.6f}", formation_flag])
-            # 디스크 안전성 위해 주기적으로 flush (10Hz라 부담 적음)
+            self._writer.writerow([
+                f"{sim_time:.6f}", f"{x:.6f}", f"{y:.6f}",
+                f"{spd:.6f}", f"{pitch:.6f}", formation_flag
+            ])
             self._file.flush()
 
         except Exception as e:
-            self.get_logger().error(f"[{self.get_namespace()}] Timer error: {e}")
+            self.get_logger().error(f"[{self.get_namespace()}] Log error: {e}")
 
     def destroy_node(self):
         try:

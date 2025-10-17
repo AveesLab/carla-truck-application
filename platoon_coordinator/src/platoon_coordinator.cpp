@@ -64,7 +64,7 @@ void PlatoonCoordinator::optimization_timer_callback()
     int id = kv.first;
     const TruckState &st = kv.second;
     double prev = previous_soc_[id];
-    if (prev > 0.0 && (prev - st.soc) >= 1.0) 
+    if (prev > 0.0 && (prev - st.soc) >= 3.0) 
     {
       need_rotate = true;
       break;

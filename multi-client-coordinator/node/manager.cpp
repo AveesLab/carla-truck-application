@@ -14,10 +14,12 @@ SyncManager::SyncManager()
     : Node("sync_manager_node"), registration_(10,false), sync_throttle(10,false), sync_steer(10,false) {
 
             rclcpp::QoS custom_qos(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
+            std::cerr << "-----------------1-----------------" << std::endl;
             custom_qos.reliable();
             client = new cc::Client(host, port);
-            world = new cc::World(client->GetWorld());
-      //      timer_ = this->create_wall_timer(50ms, std::bind(&SyncManager::timerCallback, this));
+            //world = new cc::World(client->GetWorld());
+            client->SetTimeout(10s);
+            timer_ = this->create_wall_timer(50ms, std::bind(&SyncManager::timerCallback, this));
             TruckSizeSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/numtruckss", 10, std::bind(&SyncManager::TruckSizeSubCallback, this, std::placeholders::_1));
             RegistrationSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/registration", 10, std::bind(&SyncManager::RegistrationSubCallback, this, std::placeholders::_1));
             SyncThrottleSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/sync_throttle", 10, std::bind(&SyncManager::SyncThrottleSubCallback, this, std::placeholders::_1));
@@ -40,36 +42,29 @@ SyncManager::SyncManager()
             ShutdownPublisher_ = this->create_publisher<std_msgs::msg::String>("/shutdown_topic",10);
             isNodeRunning_ = true;
             TarPub_ = this->create_publisher<ros2_msg::msg::Target>("/truck0/target",10);
-            GapPub_ = this->create_publisher<std_msgs::msg::Float32>("/truck0/timegap",10);
-	        LC0Pub_ = this->create_publisher<std_msgs::msg::Int32>("/truck0/lane_change",10);
-            LC1Pub_ = this->create_publisher<std_msgs::msg::Int32>("/truck1/lane_change",10);
-  	        LC2Pub_ = this->create_publisher<std_msgs::msg::Int32>("/truck2/lane_change",10);
+            // GapPub_ = this->create_publisher<std_msgs::msg::Float32>("/truck0/timegap",10);
+	        // LC0Pub_ = this->create_publisher<std_msgs::msg::Int32>("/truck0/lane_change",10);
+            // LC1Pub_ = this->create_publisher<std_msgs::msg::Int32>("/truck1/lane_change",10);
+  	        // LC2Pub_ = this->create_publisher<std_msgs::msg::Int32>("/truck2/lane_change",10);
+            FramePub_ = this->create_publisher<std_msgs::msg::UInt32>("/sim/frame_id", 10);
 
-	        world = new cc::World(client->ReloadWorld(true));
+            world = new cc::World(client->GetWorld());
+            //world = new cc::World(client->ReloadWorld(true));
 	        settings = world->GetSettings();
             settings.synchronous_mode = true; // sync_mode
             settings.fixed_delta_seconds = 0.05f; // FPS
             world->ApplySettings(settings,time_);
-            fd = shm_open(SHARED_MEMORY_NAME, O_RDWR, 0666);
-            shared_mem_ptr = (int *)mmap(0, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+            // fd = shm_open(SHARED_MEMORY_NAME, O_RDWR, 0666);
+            // shared_mem_ptr = (int *)mmap(0, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
             manager_Thread = std::thread(&SyncManager::managerInThread, this);
             RCLCPP_INFO(this->get_logger(), "Initialize Finish");
 
             callback_id = world->OnTick([&](cc::WorldSnapshot snapshot) {
 		    auto timestamp_ = snapshot.GetTimestamp();
 		    RCLCPP_INFO(this->get_logger(), "GetTick(), delta_seconds: %lf, elapsed_seconds: %lf, frame: %d",timestamp_.delta_seconds,timestamp_.elapsed_seconds,timestamp_.frame);
-               //     sim_time += 50.0f;
-        //            recordData();
-	//	    sim_time += 50.0f;
-                    //sim_time += 10.0f;
-                    //if (fmod(sim_time, 30.0) != 0.0) {
-                                //sleep(3);
-                                //std::cerr << sim_time << std::endl;
-                               // world->Tick(time_);
-                    //}
-                });
+            });
 
-           }
+}
 
 
 SyncManager::~SyncManager(void)
@@ -140,7 +135,7 @@ void SyncManager::FV2DistSubCallback(const std_msgs::msg::Float32::SharedPtr msg
 
 
 void SyncManager::TruckSizeSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
-    //std::cerr << "TruckSizeSubCallback : "<< msg->data << std::endl;
+    std::cerr << "TruckSizeSubCallback : "<< msg->data << std::endl;
     unique_lock<mutex> lock(mutex_);
     this->size = msg->data;
     truck_ids.resize(this->size);
@@ -175,10 +170,189 @@ double SyncManager::GetDistanceBetweenActors(ActorPtr current, ActorPtr target) 
     return distance;
 }
 
+
+
+
+void SyncManager::RegistrationSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
+    unique_lock<mutex> lock(mutex_);
+    std::cerr << "RegistrationSubCallback : "<< msg->data << std::endl;
+    registration_[msg->data] = true;
+}
+
+
+void SyncManager::SyncThrottleSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
+    unique_lock<mutex> lock(mutex_);
+    //std::cerr << "throttle " << std::endl;
+    sync_throttle[msg->data] = true;
+    //world->Tick(time_);
+}
+
+void SyncManager::SyncSteerSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
+    unique_lock<mutex> lock(mutex_);
+    //std::cerr << "steer" << std::endl;
+    sync_steer[msg->data] = true;
+   // world->Tick(time_);
+}
+
+bool SyncManager::check_register() {
+    if(size == 0 ) return false;
+    if(registered) return true;
+    unique_lock<mutex> lock(mutex_);
+    for(int i = 0; i<size; i++) 
+    {
+        if(registration_[i] == false) return false;
+    }
+    std::cerr << "tick for register " << std::endl;
+    if(cnt == 0) 
+    {
+        world->Tick(time_);
+        
+        std_msgs::msg::UInt32 frame_msg;
+        frame_msg.data = static_cast<uint32_t>(sim_time / 50.0f); // 또는 frame counter
+        FramePub_->publish(frame_msg);
+        
+        //FindAllTruck();
+        cnt = 1;
+        for(int i = 0; i<size; i++) {
+            if(registration_[i] == true) registration_[i] = false;
+        }
+        return false;
+    }
+    else if(cnt == 1) 
+    {
+        registered = true;
+        std::cerr << "All registered" << std::endl;
+        FindAllTruck();
+        world->Tick(time_);
+
+        std_msgs::msg::UInt32 frame_msg;
+        frame_msg.data = static_cast<uint32_t>(sim_time / 50.0f); // 또는 frame counter
+        FramePub_->publish(frame_msg);
+
+        return true;
+    }
+}
+
+void SyncManager::FindAllTruck() {
+    for(int i =0; i<this->size;i++) 
+    {
+        std::string truck_name = "truck" + std::to_string(i);
+        std::string trailer_name = "trailer" + std::to_string(i);
+        auto actor_list = world->GetActors();
+
+        for (auto iter = actor_list->begin(); iter != actor_list->end(); ++iter) 
+        {
+            ActorPtr actor = *iter;
+            ActorId actor_id = actor->GetId();
+
+            if (actor->GetTypeId().front() == 'v') 
+            {
+
+                for (auto&& attribute: actor->GetAttributes()) 
+                {
+                  if (attribute.GetValue() == truck_name) 
+                  {
+                      unsigned int truck_id = actor_id;
+                      truck_ids[i] = truck_id;
+                  }
+                  else if (attribute.GetValue() == trailer_name) 
+                  {
+                      unsigned int trailer_id = actor_id;
+                      trailer_ids[i] = trailer_id;
+                  }
+                }
+            }
+        }
+    }
+}
+
+bool SyncManager::sync_received() {
+    unique_lock<mutex> lock(mutex_);
+    // sync_throttle 배열의 모든 원소가 true인지 확인
+    for (int i = 0; i < size; i++) {
+        if (sync_throttle[i] == false) {
+            return false; // 하나라도 false면 false 반환
+        }
+    }
+
+    // sync_steer 배열의 모든 원소가 true인지 확인
+    for (int i = 0; i < size; i++) {
+        if (sync_steer[i] == false) {
+            return false; // 하나라도 false면 false 반환
+        }
+    }
+
+    //all received
+    for(int i = 0; i<size; i++) {
+        sync_throttle[i] = false;
+    }
+    for(int i = 0; i<size; i++) {
+        sync_steer[i] = false;
+    }
+
+    return true;
+
+}
+
+void SyncManager::managerInThread()
+{
+    while(isNodeRunning_) {
+        std::chrono::high_resolution_clock::time_point start_time;
+        if(check_register()) 
+        {
+
+            if(sync_received() && first) 
+            {
+               sim_time += 50.0f;
+               go_time = true;
+               if(sim_time - 1510000.0f >= 0.0f) 
+               {
+                    isNodeRunning_ = false;
+                    RCLCPP_INFO(this->get_logger(), "End");
+                   // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+                    //settings.synchronous_mode = false;
+                    //world->ApplySettings(settings,time_);
+                    sleep(2);
+                    std_msgs::msg::String msg;
+                    msg.data = "down";
+                    ShutdownPublisher_->publish(msg);
+                    rclcpp::shutdown();
+                }
+                else if(sim_time >= 90000.0f && sim_time <= 90040.0f) 
+                {
+                    /* LV Speed Change */
+                    ros2_msg::msg::Target msg;
+                    msg.tar_vel = 15.0f;
+                    TarPub_->publish(msg);
+
+                }
+                
+                //recordData();
+		        world->Tick(time_);
+
+                std_msgs::msg::UInt32 frame_msg;
+                frame_msg.data = static_cast<uint32_t>(sim_time / 50.0f); // 또는 frame counter
+                FramePub_->publish(frame_msg);
+
+	        }
+
+            if(!first) 
+            {
+                FindAllTruck();
+                RCLCPP_INFO(this->get_logger(), "Start");
+                first = true;
+                //continue;
+            }
+
+        }
+
+    }
+}
+
 void SyncManager::recordData() {
     struct timeval currentTime;
     double diff_time;
-    std::string log_path_ = "/home/nvidia/ros2_ws/logfiles/";
+    std::string log_path_ = "/home/avees/ros2_ws/src/test_truck";
 
     auto actor_list = world->GetActors();
 
@@ -238,186 +412,5 @@ void SyncManager::recordData() {
                 write_file.close();
             }
         }
-    }
-}
-
-
-void SyncManager::RegistrationSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
-    unique_lock<mutex> lock(mutex_);
-    //std::cerr << "RegistrationSubCallback : "<< msg->data << std::endl;
-    registration_[msg->data] = true;
-}
-
-
-void SyncManager::SyncThrottleSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
-    unique_lock<mutex> lock(mutex_);
-    //std::cerr << "throttle " << std::endl;
-    sync_throttle[msg->data] = true;
-    //world->Tick(time_);
-}
-
-void SyncManager::SyncSteerSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
-    unique_lock<mutex> lock(mutex_);
-    //std::cerr << "steer" << std::endl;
-    sync_steer[msg->data] = true;
-   // world->Tick(time_);
-}
-
-bool SyncManager::check_register() {
-    if(size == 0 ) return false;
-    if(registered) return true;
-    unique_lock<mutex> lock(mutex_);
-    for(int i = 0; i<size; i++) {
-        if(registration_[i] == false) return false;
-    }
-    //std::cerr << "tick for register " << std::endl;
-    if(cnt == 0) {
-        world->Tick(time_);
-        //FindAllTruck();
-        cnt = 1;
-        for(int i = 0; i<size; i++) {
-            if(registration_[i] == true) registration_[i] = false;
-        }
-        return false;
-    }
-    else if(cnt == 1) {
-        registered = true;
-        //std::cerr << "All registered" << std::endl;
-        FindAllTruck();
-        world->Tick(time_);
-        return true;
-    }
-}
-
-void SyncManager::FindAllTruck() {
-    for(int i =0; i<this->size;i++) {
-        std::string truck_name = "truck" + std::to_string(i);
-        std::string trailer_name = "trailer" + std::to_string(i);
-        auto actor_list = world->GetActors();
-        for (auto iter = actor_list->begin(); iter != actor_list->end(); ++iter) {
-            ActorPtr actor = *iter;
-            ActorId actor_id = actor->GetId();
-            if (actor->GetTypeId().front() == 'v') {
-
-                for (auto&& attribute: actor->GetAttributes()) {
-                  if (attribute.GetValue() == truck_name) {
-                      unsigned int truck_id = actor_id;
-                      truck_ids[i] = truck_id;
-                  }
-                  else if (attribute.GetValue() == trailer_name) {
-                      unsigned int trailer_id = actor_id;
-                      trailer_ids[i] = trailer_id;
-                  }
-                }
-            }
-        }
-
-    }
-
-
-}
-
-bool SyncManager::sync_received() {
-    unique_lock<mutex> lock(mutex_);
-    // sync_throttle 배열의 모든 원소가 true인지 확인
-    for (int i = 0; i < size; i++) {
-        if (sync_throttle[i] == false) {
-            return false; // 하나라도 false면 false 반환
-        }
-    }
-
-    // sync_steer 배열의 모든 원소가 true인지 확인
-    for (int i = 0; i < size; i++) {
-        if (sync_steer[i] == false) {
-            return false; // 하나라도 false면 false 반환
-        }
-    }
-
-
-    //all received
-    for(int i = 0; i<size; i++) {
-        sync_throttle[i] = false;
-    }
-    for(int i = 0; i<size; i++) {
-        sync_steer[i] = false;
-    }
-
-    return true;
-
-
-}
-
-void SyncManager::managerInThread()
-{
-    while(isNodeRunning_) {
-        std::chrono::high_resolution_clock::time_point start_time;
-        if(check_register()) {
-
-            if(sync_received() && first) {
-
-               sim_time += 50.0f;
-
-
-
-               go_time = true;
-               if(sim_time - 151000.0f >= 0.0f) {
-                    isNodeRunning_ = false;
-                    RCLCPP_INFO(this->get_logger(), "End");
-                   // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-                    //settings.synchronous_mode = false;
-                    //world->ApplySettings(settings,time_);
-                    sleep(2);
-                    std_msgs::msg::String msg;
-                    msg.data = "down";
-                    ShutdownPublisher_->publish(msg);
-                    rclcpp::shutdown();
-                }
-
-                else if(sim_time >= 90000.0f && sim_time <= 90040.0f) {
-
-                    /* LV Speed Change */
-                    ros2_msg::msg::Target msg;
-                    msg.tar_vel = 15.0f;
-                    TarPub_->publish(msg);
-
-                    /*Lane Change*/
-                    /*
-			        std_msgs::msg::Int32 msg;
-			        msg.data =4;
-			        LC0Pub_->publish(msg);
-                    */
-
-                    /* Gap Change */
-                    /*
-                    std_msgs::msg::Float32 msg;
-                    msg.data = 9.5;
-                    GapPub_->publish(msg);
-                    */
-                }
-		        /*
-		        else if(sim_time >= 90050.0f && sim_time <= 31100.0f) {
-			        std_msgs::msg::Int32 msg;
-			        msg.data=4;
-			        LC1Pub_->publish(msg);
-			        LC2Pub_->publish(msg);
-		        }
-                */
-                //recordData();
-		        world->Tick(time_);
-
-	    }
-
-                if(!first) {
-                    FindAllTruck();
-                    RCLCPP_INFO(this->get_logger(), "Start");
-                    first = true;
-                    //continue;
-                }
-
-
-
-
-        }
-
     }
 }

@@ -10,9 +10,11 @@
 #include <geometry_msgs/msg/point.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <std_msgs/msg/int32.hpp>
+#include <std_msgs/msg/u_int32.hpp>
 #include <GeographicLib/LocalCartesian.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <tf2/LinearMath/Quaternion.h>
+
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <ros2_msg/msg/truck_command.hpp>
@@ -68,11 +70,6 @@ private:
     // const Missionidx Straight_idx_2 ={79600 + 7500,155900 - 7500};
     // const Missionidx Straight_idx_3 ={157400 + 7500,233250 - 7500}; 
     // const Missionidx Straight_idx_4 ={235750 + 7500,311000 - 6000};
-
-
-
-
-    
 
     
     
@@ -165,10 +162,12 @@ private:
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr pub_steer_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_ENU_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr pub_lane_change_end_flag_;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pub_reference_velocity_;
+    rclcpp::Publisher<std_msgs::msg::UInt32>::SharedPtr pub_ready_;
     
-
     //*changed
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pub_formation_change_flag_;
+
     // Subscribers
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_formation_end_change_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_server_enu_;
@@ -177,6 +176,7 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck2_pos_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_current_velocity_;
     rclcpp::Subscription<ros2_msg::msg::TruckCommand>::SharedPtr sub_formation_command_;
+    rclcpp::Subscription<std_msgs::msg::UInt32>::SharedPtr sub_frame_;
 
 
 
@@ -196,8 +196,6 @@ private:
     void truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg);
 
-
-
     void current_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
     void truck0_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
     void truck1_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
@@ -205,6 +203,7 @@ private:
     bool check_stable_speeds();
     bool check_overspeed();
 
+    void on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg);
 
     // Formation 관련 함수들
     int calculate_leader_truck_number();

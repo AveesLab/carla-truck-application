@@ -25,10 +25,10 @@ SOCEstimatorNode::SOCEstimatorNode()
                 current_speed_ = msg->data;
             });
     //subscribe velocity control
-    control_sub_ = create_subscription<std_msgs::msg::Float64>("/" + truck_id_ + "/velocity_control", 10, 
+    reference_sub_ = create_subscription<std_msgs::msg::Float64>("/" + truck_id_ + "/reference_velocity", 10, 
             [this](const std_msgs::msg::Float64::SharedPtr msg)
             {
-                throttle_control_ = msg->data;
+                reference_velocity_ = msg->data;
             });
     // subscribe mode commands
     command_sub_ = create_subscription<TruckCommand>("/" + truck_id_ + "/command", 10, std::bind(&SOCEstimatorNode::formation_start_callback, this, std::placeholders::_1));
@@ -63,17 +63,17 @@ SOCEstimatorNode::SOCEstimatorNode()
 
     // 타이머 세팅
     start_time_ = now();
-    timer_      = create_wall_timer(std::chrono::milliseconds(100), std::bind(&SOCEstimatorNode::timer_callback, this));
+    timer_      = create_wall_timer(std::chrono::milliseconds(10), std::bind(&SOCEstimatorNode::timer_callback, this));
 
     // 초기값
     last_soc_       = 100.0;
-    last_pos_       = 0.0;
-    last_vel_       = 0.0;
+    //last_pos_       = 0.0;
+    //last_vel_       = 0.0;
     mode_changed_   = false;
 
     std::string path = std::string("/home/avees/ros2_ws/src/logs/soc_estimator_") + truck_id_ + ".csv";
     csv_file_.open(path);
-    csv_file_ << "sim_time,real_time,truck_id,mode,SOC(%),position(m),velocity(km/h)\n";
+    csv_file_ << "sim_time,real_time,truck_id,mode,SOC(%),distance(m),velocity(km/h)\n";
 
 }
 
@@ -174,15 +174,15 @@ void SOCEstimatorNode::timer_callback()
     for (int i = 0; i < num_steps; ++i) 
     {
         // 1) BMS 입력 공통 할당
-        BMSObj.rtU.velocity_control = throttle_control_;
-        BMSObj.rtU.velocity = current_speed_;
+        BMSObj.rtU.target_velocity = reference_velocity_;
+        BMSObj.rtU.ego_velocity = current_speed_;
         if(mode_ != "LV") {
             BMSObj.rtU.IVD = compute_distance(ego_pos, target_pos);
-            RCLCPP_INFO(get_logger(), "Distance to front truck: %.2f m", BMSObj.rtU.IVD);
+            //RCLCPP_INFO(get_logger(), "Distance to front truck: %.2f m", BMSObj.rtU.IVD);
         }
         else {
             BMSObj.rtU.IVD = 30.0;
-            RCLCPP_INFO(get_logger(), "In LV mode, set IVD to 30.0 m");
+            //RCLCPP_INFO(get_logger(), "In LV mode, set IVD to 30.0 m");
         }
         BMSObj.rtU.Mode = (mode_ == "LV") ? 0.0 : 1.0;
         BMSObj.rtU.Mass_kg = 40000.0;
@@ -193,20 +193,28 @@ void SOCEstimatorNode::timer_callback()
 
         // 3) 출력 읽기 및 상태 업데이트
         last_soc_ = BMSObj.rtY.SOC;
-        last_pos_ = BMSObj.rtY.Positionm;
-        last_vel_ = BMSObj.rtY.Speedms;
+        //last_pos_ = BMSObj.rtY.Positionm;
+        //last_vel_ = BMSObj.rtY.Speedms;
 
         if (mode_changed_) 
         {
             mode_changed_ = false;
         }
-
+        
+	if (has_prev_pos_) 
+	{
+	    double delta_dist = compute_distance(ego_pos, last_pos_);
+	    total_distance_m_ += delta_dist;
+	}
+	last_pos_ = ego_pos;
+	has_prev_pos_ = true;
+	
         // 4) 상태 메시지 발행
         TruckStatus status_msg;
         status_msg.truck_id = std::stoi(truck_id_.substr(5));
         status_msg.soc      = last_soc_;
-        status_msg.speed    = last_vel_;
-        status_msg.position = last_pos_;
+        status_msg.speed    = current_speed_;
+        status_msg.position = total_distance_m_;
         status_msg.mode     = mode_;
         status_pub_->publish(status_msg);
 
@@ -216,12 +224,12 @@ void SOCEstimatorNode::timer_callback()
           << truck_id_ << ","
           << mode_ << ","
           << last_soc_ << ","
-          << last_pos_ << ","
-          << last_vel_ * 3.6 << "\n";
+          << total_distance_m_ << ","
+          << current_speed_ * 3.6 << "\n";
 
     csv_file_.flush();
 	
-    RCLCPP_INFO(get_logger(),"[Sim: %.2fs | Real: %.2fs][%s:%s] SOC: %.2f%%  POS: %.2fm  VEL: %.2fkm/h / pred:%d ",now_sim_time.seconds(),wall_time.seconds(),truck_id_.c_str(), mode_.c_str(),last_soc_, last_pos_, last_vel_ * 3.6, pred_id_);
+    //RCLCPP_INFO(get_logger(),"[Sim: %.2fs | Real: %.2fs][%s:%s] SOC: %.2f%%  POS: %.2fm  VEL: %.2fkm/h / pred:%d ",now_sim_time.seconds(),wall_time.seconds(),truck_id_.c_str(), mode_.c_str(),last_soc_, total_distance_m_, current_speed_ * 3.6, pred_id_);
     }
     last_sim_time_ += rclcpp::Duration::from_seconds(consumed_time);
 }
