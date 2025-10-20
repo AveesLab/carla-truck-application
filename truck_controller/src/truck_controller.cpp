@@ -110,9 +110,12 @@ TruckController::TruckController(int argu_id)
   pub_steer_ = this->create_publisher<std_msgs::msg::Float32>(ns + "/steer_control", 10);
   pub_ENU_ = this->create_publisher<nav_msgs::msg::Odometry>(ns + "/ENU", 10 );
   pub_lane_change_end_flag_ = this->create_publisher<std_msgs::msg::Bool>("/lane_change_end_flag", 10);
+  pub_reference_velocity_ = this->create_publisher<std_msgs::msg::Float64>(ns + "/reference_velocity", 10);
 
   // *changed
   pub_formation_change_flag_ = this->create_publisher<std_msgs::msg::Int32>(ns + "/formation_change", 10);
+
+  pub_ready_ = this->create_publisher<std_msgs::msg::UInt32>(ns + "/control_ready", 10);
 
   // 자신의 위치 업데이트를 위한 구독
   sub_server_enu_ = this->create_subscription<geometry_msgs::msg::Point>(
@@ -159,16 +162,29 @@ TruckController::TruckController(int argu_id)
   sub_formation_command_ = this->create_subscription<ros2_msg::msg::TruckCommand>(
       ns + "/command", 10,
       std::bind(&TruckController::formation_command_callback, this, std::placeholders::_1));
-  // 200Hz 제어 타이머 추가
-  timer_ = this->create_wall_timer(
-      std::chrono::milliseconds(10),  // 200Hz = 5ms // 100Hz = 10ms
-      std::bind(&TruckController::compute_control, this));
+  sub_frame_ = this->create_subscription<std_msgs::msg::UInt32>("/sim/frame_id", 10, std::bind(&TruckController::on_frame_tick, this, std::placeholders::_1));
+
+//   // 200Hz 제어 타이머 추가
+//   timer_ = this->create_wall_timer(
+//       std::chrono::milliseconds(10),  // 200Hz = 5ms // 100Hz = 10ms
+//       std::bind(&TruckController::compute_control, this));
       
   //RCLCPP_INFO(this->get_logger(), "TruckController node initialized (IMU-less GPS Steer Mode). Yaw will be initialized on first control cycle.");
 
 
 
 } // 생성자 끝
+
+void TruckController::on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg)
+{
+    uint32_t frame_id = msg->data;
+
+    //로그로 프레임 확인
+    RCLCPP_DEBUG(this->get_logger(), "Frame %u tick received", frame_id);
+
+    // tick마다 제어 함수 1회 실행
+    this->compute_control();
+}
 
 // ENU 위치 수신 콜백: 위치 업데이트 후 제어 함수 호출
 void TruckController::server_enu_callback(const geometry_msgs::msg::Point::SharedPtr msg)
@@ -477,22 +493,22 @@ void TruckController::compute_control()
         
         check_mission_state_(current_wp_idx_);
         //for lane_change flag test
-        // if(deadband_flag_ == true)
-        // {
-        //     // *changed
-        //     if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
-        //     // if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
-        //     // if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
-        //     if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
-        //     // if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
-        //     // if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
-        //     if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
-        //     // if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
-        //     // if(current_wp_idx_ > 16700 && current_wp_idx_<16800) lane_change_flag_=true;
-        //     // if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
-        //     // if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
-        //     // if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
-        // }
+        if(deadband_flag_ == true)
+        {
+            // *changed
+            if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
+            // if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
+            // if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
+            if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
+            // if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
+            // if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
+            if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
+            // if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
+            // if(current_wp_idx_ > 16700 && current_wp_idx_<16800) lane_change_flag_=true;
+            // if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
+            // if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
+            // if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
+        }
 
 
 
@@ -1179,99 +1195,93 @@ bool TruckController::check_overspeed()
 
 // 2. FID와 거리에 따른 기준 속도 계산 (km/h)
 double TruckController::get_reference_velocity(int fid, double distance_to_leader) {
+    std_msgs::msg::Float64 msg;
+
     if (fid == 0) {
-        // std::stringstream ss;
-        // ss<<"leader speed";
-        // std::cout<<ss.str()<<std::endl;
         return STABLE_SPEED_;  
     } 
     
-    // FID 1,2인 경우 (후미 차량)만 거리 기반 제어
-    // 하지만 distance_to_leader가 유효하지 않으면 안전하게 STABLE_SPEED 반환
     if (std::isinf(distance_to_leader) || std::isnan(distance_to_leader)) {
-        // std::stringstream ss;
-        // ss<<"invalid distance, using stable speed";
-        // std::cout<<ss.str()<<std::endl;
         return STABLE_SPEED_;
     }
     
     if(distance_to_leader < emergency_gap_) 
     {   
-        // std::stringstream ss;
-        // ss<<"emergency stop";
-        // std::cout<<ss.str()<<std::endl;
         return -100.0;
     }
 
     if (distance_to_leader < min_gap_) 
     {
-        // std::stringstream ss;
-        // ss<<"slow down";
-        // std::cout<<ss.str()<<std::endl;
         return SLOW_SPEED_;  
     } 
-    else if (distance_to_leader < desired_gap_)  //min_gap이상 desired_gap이하 ex) 20~30
+    else if (distance_to_leader < desired_gap_)  
     {
-        // std::stringstream ss;
-        // ss<<"stable speed";
-        // std::cout<<ss.str()<<std::endl;
         return STABLE_SPEED_;  
     } 
-    else //desired_gap이상  부스트업
+    else 
     {   
-        // std::stringstream ss;
-        // ss<<"accelerate";
-        // std::cout<<ss.str()<<std::endl;
         return ACC_SPEED_;  
     }
 }
 
 // 3. 조향각에 따른 속도 감소
-double TruckController::adjust_velocity_for_steering(double base_velocity, double steering) {
+double TruckController::adjust_velocity_for_steering(double base_velocity, double steering) 
+{
+    std_msgs::msg::Float64 msg;
     double abs_steering = std::abs(steering);
-    
-    // emergency stop 신호인 경우 그대로 유지 (범위 확인으로 정밀도 문제 해결)
-    if(base_velocity < -50.0) {
-        if(formation_id_ == 0)
-        {
-            std::cout<<"is leader emer? at adjust_velocity_for_steering"<<std::endl;
-        }
-        return -100.0;
-    }
-    if(deadband_flag_ == true)
+    double adjusted_velocity = base_velocity;
+
+    // 1️⃣ 비상정지 신호 유지
+    if (base_velocity < -50.0) 
     {
-        return base_velocity;
-    }
-    else
-    {   
-        if(abs_steering >= 0.15)
-        {
-            return base_velocity * 0.7;
-        }
-        else if(abs_steering >= 0.10)
-        {
-            return base_velocity * 0.8;
-        }
-        else if(abs_steering >= 0.05)
-        {
-            return base_velocity * 0.9;
-        }
-        else
-        {
-            return base_velocity;
-        }
+        adjusted_velocity = -100.0;
+        msg.data = adjusted_velocity;
+        pub_reference_velocity_->publish(msg);
+
+        if (formation_id_ == 0)
+            std::cout << "[Leader Emergency Stop Detected @ adjust_velocity_for_steering]" << std::endl;
+
+        return adjusted_velocity;
     }
 
-     
-     
- 
-     // if (abs_steering >= 0.06) {
-     //     return base_velocity * 0.5;  // 조향각 0.06 이상
-     // } else if (abs_steering >= 0.04) {
-     //     return base_velocity * 0.7;  // 조향각 0.04 이상
-     // }
-     
-     return base_velocity;  // 조향각 작은 경우 원래 속도
+    // 2️⃣ Deadband(직선 또는 안정 구간) → 감속 적용 안 함
+    if (deadband_flag_ == true)
+    {
+        adjusted_velocity = base_velocity;
+        msg.data = adjusted_velocity;
+        pub_reference_velocity_->publish(msg);
+        return adjusted_velocity;
+    }
+
+    // 3️⃣ 조향각 기반 감속
+    if (abs_steering >= 0.15)
+    {
+        adjusted_velocity = base_velocity * 0.7;
+        msg.data = adjusted_velocity;
+        pub_reference_velocity_->publish(msg);
+        return adjusted_velocity;
+    }
+    else if (abs_steering >= 0.10)
+    {
+        adjusted_velocity = base_velocity * 0.8;
+        msg.data = adjusted_velocity;
+        pub_reference_velocity_->publish(msg);
+        return adjusted_velocity;
+    }
+    else if (abs_steering >= 0.05)
+    {
+        adjusted_velocity = base_velocity * 0.9;
+        msg.data = adjusted_velocity;
+        pub_reference_velocity_->publish(msg);
+        return adjusted_velocity;
+    }
+    else
+    {
+        adjusted_velocity = base_velocity;
+        msg.data = adjusted_velocity;
+        pub_reference_velocity_->publish(msg);
+        return adjusted_velocity;
+    }
 }
 
 // 4. PID 제어

@@ -32,10 +32,10 @@ def generate_nodes(context, *, num_trucks, map_name):
                 sync_param_file,
                             {            
                                 'use_sim_time': True ,          
-                                'fixed_delta_seconds': 0.005,
+                                #'fixed_delta_seconds': 0.005,
                                 'max_substep_delta_time': 0.005,
                                 'max_substeps': 2,
-                                'synchronous_mode_wait_for_vehicle_control_command': True
+                                'synchronous_mode_wait_for_vehicle_control_command': False
                                 
                             },
                 ],
