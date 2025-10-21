@@ -64,10 +64,13 @@ TruckController::TruckController(int argu_id)
   this->get_parameter("STABLE_SPEED", STABLE_SPEED_);
 
   this->get_parameter("WHEEL_BASE", WHEEL_BASE_);
-  this->get_parameter("MIN_GAP", min_gap_);
-  this->get_parameter("DESIRED_GAP", desired_gap_);
-  this->get_parameter("EMERGENCY_GAP", emergency_gap_);
+  this->get_parameter("MIN_GAP", MIN_GAP_);
+  this->get_parameter("DESIRED_GAP", DESIRED_GAP_);
+  this->get_parameter("EMERGENCY_GAP", EMERGENCY_GAP_);
 
+  min_gap_ = MIN_GAP_;
+  desired_gap_ = DESIRED_GAP_;
+  emergency_gap_ = EMERGENCY_GAP_;
 
   // --- 상태 변수 초기화 ---
   prev_x_ = std::numeric_limits<double>::quiet_NaN(); // 이전 위치 없음 표시
@@ -221,7 +224,6 @@ void TruckController::server_enu_callback(const geometry_msgs::msg::Point::Share
 
 
 
-// Formation 변경 시 새로운 FID 계산
 void TruckController::update_formation_id() {
     if(actor_id_ == 0){
         std::cout<<"update_formation_id 호출"<<std::endl;
@@ -229,6 +231,19 @@ void TruckController::update_formation_id() {
     formation_change_count_++;
     // Formation 변경 시 FID 순환: 0->2, 1->0, 2->1
     formation_id_ = (formation_id_ + 2) % 3;
+
+    LV_fid = (LV_fid + 2) % 3;
+    FV1_fid = (FV1_fid + 2) % 3;
+    FV2_fid = (FV2_fid + 2) % 3;
+    if(formation_id_ == 0)
+    {
+
+        //herecout
+        std::cout<<"LV_fid : "<<LV_fid<<std::endl;
+        std::cout<<"FV1_fid : "<<FV1_fid<<std::endl;
+        std::cout<<"FV2_fid : "<<FV2_fid<<std::endl;
+    }
+    
 
 }
 
@@ -261,10 +276,25 @@ void TruckController::formation_change_end_callback(const std_msgs::msg::Bool::S
 }
 
 void TruckController::formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg) {
-    if(msg->lane_change_flag == true)
-    {
+    if(false)  
+    {//prevent lane change
+        lane_change_flag_= false;
+        std::cout<<"blocking lane change callback"<<std::endl;
+    } 
+    else if(msg->lane_change_flag == true)
+    { 
         // *changed
-        lane_change_flag_=true;
+        if(check_stable_gaps() == false)//lane changed conditon check
+        {
+            //no meet condition
+            std::cerr<<"No stable gap condition : ignore lane change"<<std::endl;
+            
+        }else{
+            //admit lane change
+            lane_change_flag_ = msg->lane_change_flag;
+            
+            
+        }
     }
 }
 
@@ -1170,6 +1200,39 @@ bool TruckController::check_stable_speeds()
 
         return false;
     }
+}
+
+bool TruckController::check_stable_gaps()
+{
+
+    if (!std::isnan(truck_positions_[LV_fid].x) && !std::isnan(truck_positions_[LV_fid].y)
+     && !std::isnan(truck_positions_[FV1_fid].x) && !std::isnan(truck_positions_[FV1_fid].y)
+     && !std::isnan(truck_positions_[FV2_fid].x) && !std::isnan(truck_positions_[FV2_fid].y))
+    {
+
+        auto LV_pos = truck_positions_[LV_fid];
+        auto FV1_pos = truck_positions_[FV1_fid];
+        auto FV2_pos = truck_positions_[FV2_fid];
+        
+        double gap_01 = distSq({LV_pos.x, LV_pos.y}, {FV1_pos.x, FV1_pos.y})- TRUCK_LENGTH; //sensor distance - truck length
+        double gap_12 = distSq({FV1_pos.x, FV1_pos.y}, {FV2_pos.x, FV2_pos.y})- TRUCK_LENGTH;
+        if (gap_01 < DESIRED_GAP_ && gap_01 > MIN_GAP_)
+        {
+            if(gap_12 < DESIRED_GAP_ && gap_12 > MIN_GAP_)
+            {
+                return true;
+            }
+
+        }
+        
+
+
+
+
+
+    }
+    return false;
+
 }
 
 bool TruckController::check_overspeed()
