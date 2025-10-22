@@ -145,11 +145,17 @@ private:
     // *changed
     bool truck0_overspeed_flag_;
     bool truck1_overspeed_flag_;
-    bool truck2_overspeed_flag_;
+    bool truck2_overspeed_flag_;    
 
-    int LV_fid = 0;
-    int FV1_fid = 1;
-    int FV2_fid = 2;
+    // *changed
+    int LV_aid = 0;
+    int FV1_aid = 1;
+    int FV2_aid = 2;
+
+    double acc_speed_;
+    double slow_speed_;
+    double stable_speed_;
+
     
 
     // 웨이포인트 관련
