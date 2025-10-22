@@ -72,6 +72,11 @@ TruckController::TruckController(int argu_id)
   desired_gap_ = DESIRED_GAP_;
   emergency_gap_ = EMERGENCY_GAP_;
 
+  acc_speed_ = ACC_SPEED_;
+  slow_speed_ = SLOW_SPEED_;
+  stable_speed_ = STABLE_SPEED_;
+
+
   // --- 상태 변수 초기화 ---
   prev_x_ = std::numeric_limits<double>::quiet_NaN(); // 이전 위치 없음 표시
   prev_y_ = std::numeric_limits<double>::quiet_NaN();
@@ -167,14 +172,11 @@ TruckController::TruckController(int argu_id)
       std::bind(&TruckController::formation_command_callback, this, std::placeholders::_1));
   sub_frame_ = this->create_subscription<std_msgs::msg::UInt32>("/sim/frame_id", 10, std::bind(&TruckController::on_frame_tick, this, std::placeholders::_1));
 
-//   // 200Hz 제어 타이머 추가
-//   timer_ = this->create_wall_timer(
-//       std::chrono::milliseconds(10),  // 200Hz = 5ms // 100Hz = 10ms
-//       std::bind(&TruckController::compute_control, this));
-      
+
+  // set-scenario
+  sub__scenario_flag_ = this->create_subscription<std_msgs::msg::Bool>("/_scenario_flag", 10, std::bind(&TruckController::_scenario_flag_callback, this, std::placeholders::_1));
+
   //RCLCPP_INFO(this->get_logger(), "TruckController node initialized (IMU-less GPS Steer Mode). Yaw will be initialized on first control cycle.");
-
-
 
 } // 생성자 끝
 
@@ -224,6 +226,7 @@ void TruckController::server_enu_callback(const geometry_msgs::msg::Point::Share
 
 
 
+// Formation 변경 시 새로운 FID 계산
 void TruckController::update_formation_id() {
     if(actor_id_ == 0){
         std::cout<<"update_formation_id 호출"<<std::endl;
@@ -276,7 +279,8 @@ void TruckController::formation_change_end_callback(const std_msgs::msg::Bool::S
 }
 
 void TruckController::formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg) {
-    if(false)  
+// set-scenario
+    if(_scenario_flag_ == true)  
     {//prevent lane change
         lane_change_flag_= false;
         std::cout<<"blocking lane change callback"<<std::endl;
@@ -297,6 +301,23 @@ void TruckController::formation_command_callback(const ros2_msg::msg::TruckComma
         }
     }
 }
+// set-scenario
+void TruckController::_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+    
+    if(lane_change_flag_ == true)
+    {//prevent cut in scenario
+        _scenario_flag_ = false;
+        std::cout<<"blocking _scenario_flag callback"<<std::endl;
+    }
+    else if(msg->data == true)
+    {
+        _scenario_flag_ = msg->data;
+        std::cout<<"_scenario_flag_ : "<<_scenario_flag_<<std::endl;
+    }
+    else {_scenario_flag_ = false;}
+
+}
+
 
 
 // 상태 기반 제어 로직
@@ -526,18 +547,22 @@ void TruckController::compute_control()
         if(deadband_flag_ == true)
         {
             // *changed
-            if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
+            //if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
             // if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
             // if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
-            if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
+            //if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
             // if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
             // if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
-            if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
+            //if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
             // if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
             // if(current_wp_idx_ > 16700 && current_wp_idx_<16800) lane_change_flag_=true;
             // if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
             // if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
             // if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
+            // set-scenario
+            mission_taken_on_();
+
+            
         }
 
 
@@ -680,12 +705,7 @@ void TruckController::compute_control()
                                                                 distance_to_leader,
                                                                 current_velocity_, 
                                                                 steer_msg.data );
-            // if(formation_id_ == 1)
-            // {
-            //     std::cout<<"actor_id_ : "<<actor_id_<<std::endl;
-            //     std::cout<<"current_wp_idx_ : "<<current_wp_idx_<<std::endl;
-            //     std::cout<<"lane_change_flag_ : "<<lane_change_flag_<<std::endl;
-            // }
+
 
             //*changed
             if(formation_change_flag_ != 2) formation_change_flag_=0; //not changing
@@ -1184,9 +1204,9 @@ bool TruckController::check_stable_speeds()
     double under_diff = 0.18;
     double over_diff = 0.18;
 
-    if(truck0_velocity_ >STABLE_SPEED_ - under_diff  && truck0_velocity_ < STABLE_SPEED_ + over_diff &&
-       truck1_velocity_ >STABLE_SPEED_ - under_diff && truck1_velocity_ < STABLE_SPEED_ + over_diff &&
-       truck2_velocity_ >STABLE_SPEED_ - under_diff && truck2_velocity_ < STABLE_SPEED_ + over_diff)
+    if(truck0_velocity_ >stable_speed_ - under_diff  && truck0_velocity_ < stable_speed_ + over_diff &&
+       truck1_velocity_ >stable_speed_ - under_diff && truck1_velocity_ < stable_speed_ + over_diff &&
+       truck2_velocity_ >stable_speed_ - under_diff && truck2_velocity_ < stable_speed_ + over_diff)
     {
         std::cout<<"stable speeds"<<std::endl;
         return true;
@@ -1235,6 +1255,7 @@ bool TruckController::check_stable_gaps()
 
 }
 
+
 bool TruckController::check_overspeed()
 {
     if(truck0_overspeed_flag_ == true || truck1_overspeed_flag_ == true || truck2_overspeed_flag_ == true)
@@ -1261,11 +1282,11 @@ double TruckController::get_reference_velocity(int fid, double distance_to_leade
     std_msgs::msg::Float64 msg;
 
     if (fid == 0) {
-        return STABLE_SPEED_;  
+        return stable_speed_;  
     } 
     
     if (std::isinf(distance_to_leader) || std::isnan(distance_to_leader)) {
-        return STABLE_SPEED_;
+        return stable_speed_;
     }
     
     if(distance_to_leader < emergency_gap_) 
@@ -1275,15 +1296,15 @@ double TruckController::get_reference_velocity(int fid, double distance_to_leade
 
     if (distance_to_leader < min_gap_) 
     {
-        return SLOW_SPEED_;  
+        return  slow_speed_;  
     } 
     else if (distance_to_leader < desired_gap_)  
     {
-        return STABLE_SPEED_;  
+        return stable_speed_;  
     } 
     else 
     {   
-        return ACC_SPEED_;  
+        return acc_speed_;  
     }
 }
 
@@ -1498,3 +1519,32 @@ void TruckController::check_overrun()
     }
 
 }
+
+
+void TruckController::mission_taken_on_()
+{// set-scenario
+    if(_scenario_flag_ == false)
+    {
+        // set normal mission param back
+
+
+        return;
+
+    } 
+    if(lane_change_flag_ == true) return;
+    else 
+    {
+
+
+
+
+            
+
+            // jamming 
+
+        
+    }
+
+
+}
+
