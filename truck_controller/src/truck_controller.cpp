@@ -174,7 +174,7 @@ TruckController::TruckController(int argu_id)
 
 
   // set-scenario
-  sub__scenario_flag_ = this->create_subscription<std_msgs::msg::Bool>("/_scenario_flag", 10, std::bind(&TruckController::_scenario_flag_callback, this, std::placeholders::_1));
+  sub_emergency_stop_scenario_flag_ = this->create_subscription<std_msgs::msg::Bool>("/emergency_stop_scenario_flag", 10, std::bind(&TruckController::emergency_stop_scenario_flag_callback, this, std::placeholders::_1));
 
   //RCLCPP_INFO(this->get_logger(), "TruckController node initialized (IMU-less GPS Steer Mode). Yaw will be initialized on first control cycle.");
 
@@ -280,7 +280,7 @@ void TruckController::formation_change_end_callback(const std_msgs::msg::Bool::S
 
 void TruckController::formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg) {
 // set-scenario
-    if(_scenario_flag_ == true)  
+    if(emergency_stop_scenario_flag_ == true)  
     {//prevent lane change
         lane_change_flag_= false;
         std::cout<<"blocking lane change callback"<<std::endl;
@@ -302,19 +302,19 @@ void TruckController::formation_command_callback(const ros2_msg::msg::TruckComma
     }
 }
 // set-scenario
-void TruckController::_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+void TruckController::emergency_stop_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg) {
     
     if(lane_change_flag_ == true)
     {//prevent cut in scenario
-        _scenario_flag_ = false;
+        emergency_stop_scenario_flag_ = false;
         std::cout<<"blocking _scenario_flag callback"<<std::endl;
     }
     else if(msg->data == true)
     {
-        _scenario_flag_ = msg->data;
-        std::cout<<"_scenario_flag_ : "<<_scenario_flag_<<std::endl;
+        emergency_stop_scenario_flag_ = msg->data;
+        std::cout<<"emergency_stop_scenario_flag_ : "<<emergency_stop_scenario_flag_<<std::endl;
     }
-    else {_scenario_flag_ = false;}
+    else {emergency_stop_scenario_flag_ = false;}
 
 }
 
@@ -560,7 +560,7 @@ void TruckController::compute_control()
             // if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
             // if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
             // set-scenario
-            mission_taken_on_();
+            mission_taken_on_EMERGENCY_STOP();
 
             
         }
@@ -1521,12 +1521,14 @@ void TruckController::check_overrun()
 }
 
 
-void TruckController::mission_taken_on_()
+void TruckController::mission_taken_on_EMERGENCY_STOP()
 {// set-scenario
-    if(_scenario_flag_ == false)
+    if(emergency_stop_scenario_flag_ == false)
     {
         // set normal mission param back
-
+        acc_speed_ = ACC_SPEED_;
+        slow_speed_ = SLOW_SPEED_;
+        stable_speed_ = STABLE_SPEED_;
 
         return;
 
@@ -1540,7 +1542,11 @@ void TruckController::mission_taken_on_()
 
             
 
-            // jamming 
+            // e-stop
+            acc_speed_ = -100.0 ;
+            slow_speed_ = -100.0 ;
+            stable_speed_ = -100.0 ;
+
 
         
     }
