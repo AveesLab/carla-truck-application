@@ -168,7 +168,7 @@ TruckController::TruckController(int argu_id)
       "/lane_change_end_flag", 10,
       std::bind(&TruckController::formation_change_end_callback, this, std::placeholders::_1));
   sub_formation_command_ = this->create_subscription<ros2_msg::msg::TruckCommand>(
-      ns + "/command", 10,
+        "/command", 10,
       std::bind(&TruckController::formation_command_callback, this, std::placeholders::_1));
   sub_frame_ = this->create_subscription<std_msgs::msg::UInt32>("/sim/frame_id", 10, std::bind(&TruckController::on_frame_tick, this, std::placeholders::_1));
 
@@ -233,16 +233,16 @@ void TruckController::update_formation_id() {
     // Formation 변경 시 FID 순환: 0->2, 1->0, 2->1
     formation_id_ = (formation_id_ + 2) % 3;
 
-    LV_fid = (LV_fid + 2) % 3;
-    FV1_fid = (FV1_fid + 2) % 3;
-    FV2_fid = (FV2_fid + 2) % 3;
+    LV_aid = (LV_aid + 1) % 3;
+    FV1_aid = (FV1_aid + 1) % 3;
+    FV2_aid = (FV2_aid + 1) % 3;
     if(formation_id_ == 0)
     {
 
         //herecout
-        std::cout<<"LV_fid : "<<LV_fid<<std::endl;
-        std::cout<<"FV1_fid : "<<FV1_fid<<std::endl;
-        std::cout<<"FV2_fid : "<<FV2_fid<<std::endl;
+        std::cout<<"LV_aid : "<<LV_aid<<std::endl;
+        std::cout<<"FV1_aid : "<<FV1_aid<<std::endl;
+        std::cout<<"FV2_aid : "<<FV2_aid<<std::endl;
     }
     
 
@@ -1211,10 +1211,10 @@ bool TruckController::check_stable_speeds()
     }
     else
     {
-        std::cout<<"unstable speeds"<<std::endl;
-        std::cout<<"truck0_velocity_ : "<<truck0_velocity_<<std::endl;
-        std::cout<<"truck1_velocity_ : "<<truck1_velocity_<<std::endl;
-        std::cout<<"truck2_velocity_ : "<<truck2_velocity_<<std::endl;
+        //std::cout<<"unstable speeds"<<std::endl;
+        //std::cout<<"truck0_velocity_ : "<<truck0_velocity_<<std::endl;
+        //std::cout<<"truck1_velocity_ : "<<truck1_velocity_<<std::endl;
+        //std::cout<<"truck2_velocity_ : "<<truck2_velocity_<<std::endl;
 
         return false;
     }
@@ -1223,17 +1223,29 @@ bool TruckController::check_stable_speeds()
 bool TruckController::check_stable_gaps()
 {
 
-    if (!std::isnan(truck_positions_[LV_fid].x) && !std::isnan(truck_positions_[LV_fid].y)
-     && !std::isnan(truck_positions_[FV1_fid].x) && !std::isnan(truck_positions_[FV1_fid].y)
-     && !std::isnan(truck_positions_[FV2_fid].x) && !std::isnan(truck_positions_[FV2_fid].y))
+
+    if (!std::isnan(truck_positions_[LV_aid].x) && !std::isnan(truck_positions_[LV_aid].y)
+     && !std::isnan(truck_positions_[FV1_aid].x) && !std::isnan(truck_positions_[FV1_aid].y)
+     && !std::isnan(truck_positions_[FV2_aid].x) && !std::isnan(truck_positions_[FV2_aid].y))
     {
 
-        auto LV_pos = truck_positions_[LV_fid];
-        auto FV1_pos = truck_positions_[FV1_fid];
-        auto FV2_pos = truck_positions_[FV2_fid];
+        auto LV_pos = truck_positions_[LV_aid];
+        auto FV1_pos = truck_positions_[FV1_aid];
+        auto FV2_pos = truck_positions_[FV2_aid];
         
-        double gap_01 = distSq({LV_pos.x, LV_pos.y}, {FV1_pos.x, FV1_pos.y})- TRUCK_LENGTH; //sensor distance - truck length
-        double gap_12 = distSq({FV1_pos.x, FV1_pos.y}, {FV2_pos.x, FV2_pos.y})- TRUCK_LENGTH;
+        double gap_01 = sqrt(distSq({LV_pos.x, LV_pos.y}, {FV1_pos.x, FV1_pos.y}))- TRUCK_LENGTH; //sensor distance - truck length
+        double gap_12 = sqrt(distSq({FV1_pos.x, FV1_pos.y}, {FV2_pos.x, FV2_pos.y}))- TRUCK_LENGTH;
+
+        if(formation_id_== 0)
+        {
+            std::cout<<"gap_01 : "<<gap_01<<std::endl;
+            std::cout<<"gap_12 : "<<gap_12<<std::endl;
+            
+        } 
+
+
+
+
         if (gap_01 < DESIRED_GAP_ && gap_01 > MIN_GAP_)
         {
             if(gap_12 < DESIRED_GAP_ && gap_12 > MIN_GAP_)
@@ -1249,6 +1261,9 @@ bool TruckController::check_stable_gaps()
 
 
     }
+
+
+
     return false;
 
 }
