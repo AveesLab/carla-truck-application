@@ -60,6 +60,9 @@ private:
     const double SENSOR_TO_FRONT = 4.0;
     const double SENSOR_TO_REAR = 12.0;
     const double STEERING_THRESHOLD = 0.04;                  // 조향각 임계값
+    double MIN_GAP_;
+    double DESIRED_GAP_;
+    double EMERGENCY_GAP_ ;
 
     const Missionidx Curve_idx_1 ={300-300,1800+300};
     const Missionidx Curve_idx_2 ={78100-300,79600+300};
@@ -133,6 +136,7 @@ private:
 
     // *changed
     int formation_change_flag_=0;
+    bool _scenario_flag_     = false;// set-scenario
 
     // *changed
     double truck0_velocity_;
@@ -142,8 +146,16 @@ private:
     // *changed
     bool truck0_overspeed_flag_;
     bool truck1_overspeed_flag_;
-    bool truck2_overspeed_flag_;
+    bool truck2_overspeed_flag_;    
 
+    // *changed
+    int LV_aid = 0;
+    int FV1_aid = 1;
+    int FV2_aid = 2;
+
+    double acc_speed_;
+    double slow_speed_;
+    double stable_speed_;
 
     
 
@@ -177,7 +189,7 @@ private:
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_current_velocity_;
     rclcpp::Subscription<ros2_msg::msg::TruckCommand>::SharedPtr sub_formation_command_;
     rclcpp::Subscription<std_msgs::msg::UInt32>::SharedPtr sub_frame_;
-
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub__scenario_flag_; //set-scenario
 
 
     // *changed
@@ -195,6 +207,7 @@ private:
     void truck1_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg);
+    void _scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg);// set-scenario
 
     void current_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
     void truck0_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
@@ -232,6 +245,7 @@ private:
     void check_overrun();
     void check_lane_change_end();
     void update_formation_id();
-    
+    bool check_stable_gaps();
+    void mission_taken_on_();// set-scenario
 
 };
