@@ -172,7 +172,9 @@ TruckController::TruckController(int argu_id)
       std::bind(&TruckController::formation_command_callback, this, std::placeholders::_1));
   sub_frame_ = this->create_subscription<std_msgs::msg::UInt32>("/sim/frame_id", 10, std::bind(&TruckController::on_frame_tick, this, std::placeholders::_1));
 
-  sub_traffic_jam_scenario_flag_ = this->create_subscription<std_msgs::msg::Bool>("/traffic_jam_scenario_flag", 10, std::bind(&TruckController::traffic_jam_scenario_flag_callback, this, std::placeholders::_1));
+
+  // set-scenario
+  sub__scenario_flag_ = this->create_subscription<std_msgs::msg::Bool>("/_scenario_flag", 10, std::bind(&TruckController::_scenario_flag_callback, this, std::placeholders::_1));
 
   //RCLCPP_INFO(this->get_logger(), "TruckController node initialized (IMU-less GPS Steer Mode). Yaw will be initialized on first control cycle.");
 
@@ -277,8 +279,8 @@ void TruckController::formation_change_end_callback(const std_msgs::msg::Bool::S
 }
 
 void TruckController::formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg) {
-
-    if(traffic_jam_scenario_flag_ == true)  
+// set-scenario
+    if(_scenario_flag_ == true)  
     {//prevent lane change
         lane_change_flag_= false;
         std::cout<<"blocking lane change callback"<<std::endl;
@@ -299,20 +301,20 @@ void TruckController::formation_command_callback(const ros2_msg::msg::TruckComma
         }
     }
 }
-
-void TruckController::traffic_jam_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+// set-scenario
+void TruckController::_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg) {
     
     if(lane_change_flag_ == true)
     {//prevent cut in scenario
-        traffic_jam_scenario_flag_ = false;
-        std::cout<<"blocking traffic_jam_scenario_flag callback"<<std::endl;
+        _scenario_flag_ = false;
+        std::cout<<"blocking _scenario_flag callback"<<std::endl;
     }
     else if(msg->data == true)
     {
-        traffic_jam_scenario_flag_ = msg->data;
-        std::cout<<"traffic_jam_scenario_flag_ : "<<traffic_jam_scenario_flag_<<std::endl;
+        _scenario_flag_ = msg->data;
+        std::cout<<"_scenario_flag_ : "<<_scenario_flag_<<std::endl;
     }
-    else {traffic_jam_scenario_flag_ = false;}
+    else {_scenario_flag_ = false;}
 
 }
 
@@ -557,8 +559,8 @@ void TruckController::compute_control()
             // if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
             // if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
             // if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
-
-            mission_taken_on_TRAFFIC_JAM();
+            // set-scenario
+            mission_taken_on_();
 
             
         }
@@ -1519,14 +1521,12 @@ void TruckController::check_overrun()
 }
 
 
-void TruckController::mission_taken_on_TRAFFIC_JAM()
-{
-    if(traffic_jam_scenario_flag_ == false)
+void TruckController::mission_taken_on_()
+{// set-scenario
+    if(_scenario_flag_ == false)
     {
         // set normal mission param back
-        acc_speed_ = ACC_SPEED_;
-        slow_speed_ = SLOW_SPEED_;
-        stable_speed_ = STABLE_SPEED_;
+
 
         return;
 
@@ -1534,9 +1534,7 @@ void TruckController::mission_taken_on_TRAFFIC_JAM()
     if(lane_change_flag_ == true) return;
     else 
     {
-        acc_speed_ = ACC_SPEED_*(0.6667);
-        slow_speed_ = SLOW_SPEED_*(0.6667);
-        stable_speed_ = STABLE_SPEED_*(0.6667);
+
 
 
 
