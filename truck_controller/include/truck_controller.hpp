@@ -43,6 +43,18 @@ struct Missionidx
     int finish_idx;   
 };
 
+struct InputsReady {
+  uint32_t frame_id = 0;
+  uint32_t t0_enu = 0;
+  uint32_t t1_enu = 0;
+  uint32_t t2_enu = 0;
+  uint32_t t0_vel = 0;
+  uint32_t t1_vel = 0;
+  uint32_t t2_vel = 0;
+  
+  bool computed = false;
+};
+
 class TruckController : public rclcpp::Node
 {
 public:
@@ -133,6 +145,7 @@ private:
 
     // *changed
     int formation_change_flag_=0;
+    uint32_t last_frame_id_ = 0;
 
     // *changed
     double truck0_velocity_;
@@ -144,7 +157,8 @@ private:
     bool truck1_overspeed_flag_;
     bool truck2_overspeed_flag_;
 
-
+    mutable std::mutex ready_mtx_;
+    InputsReady ready_;
     
 
     // 웨이포인트 관련
@@ -195,6 +209,7 @@ private:
     void truck1_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg);
+    bool all_inputs_ready() const; 
 
     void current_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
     void truck0_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);

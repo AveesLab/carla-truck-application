@@ -26,166 +26,169 @@ TruckController::TruckController(int argu_id)
   lane_number_(0)
 {
 
-  // Formation ID 설정
-  if(actor_id_ == 0) formation_id_ = 0;
-  else if(actor_id_ == 1) formation_id_ = 1;
-  else if(actor_id_ == 2) formation_id_ = 2;
-  else {
-    //RCLCPP_ERROR(this->get_logger(), "Invalid actor_id: %d", actor_id_);
-    throw std::runtime_error("Invalid actor_id");
-  }
-  
-  if(actor_id_ == 1) current_wp_idx_ = 0;
-  if(actor_id_ == 2) current_wp_idx_ = 0;
-
-  // --- 파라미터 선언 및 값 가져오기 ---
-  this->declare_parameter<std::string>("csv_path", "");
-  this->declare_parameter<double>("curve_lookahead_dist"); 
-  this->declare_parameter<double>("straight_lookahead_dist"); 
-
-  this->declare_parameter<double>("ACC_SPEED");     
-  this->declare_parameter<double>("SLOW_SPEED");     
-  this->declare_parameter<double>("STABLE_SPEED");     
-
-  this->declare_parameter<double>("WHEEL_BASE");    
-  this->declare_parameter<double>("MIN_GAP");
-  this->declare_parameter<double>("DESIRED_GAP");
-  this->declare_parameter<double>("EMERGENCY_GAP");
-
-  // 군집 주행 관련 파라미터 선언
-  std::string csv_path;
-
-  this->get_parameter("csv_path", csv_path);
-  this->get_parameter("curve_lookahead_dist", curve_lookahead_dist_);
-  this->get_parameter("straight_lookahead_dist", straight_lookahead_dist_);
-
-  this->get_parameter("ACC_SPEED", ACC_SPEED_);
-  this->get_parameter("SLOW_SPEED", SLOW_SPEED_);
-  this->get_parameter("STABLE_SPEED", STABLE_SPEED_);
-
-  this->get_parameter("WHEEL_BASE", WHEEL_BASE_);
-  this->get_parameter("MIN_GAP", min_gap_);
-  this->get_parameter("DESIRED_GAP", desired_gap_);
-  this->get_parameter("EMERGENCY_GAP", emergency_gap_);
-
-
-  // --- 상태 변수 초기화 ---
-  prev_x_ = std::numeric_limits<double>::quiet_NaN(); // 이전 위치 없음 표시
-  prev_y_ = std::numeric_limits<double>::quiet_NaN();
-  start_x_ = std::numeric_limits<double>::quiet_NaN(); // 시작 위치는 아직 모름
-  start_y_ = std::numeric_limits<double>::quiet_NaN();
-  current_yaw_ = 0.0; // 초기 Yaw는 우선 0 또는 경로 방향으로 설정 (직진 유도용)
-
-  // 웨이포인트 로드 (이 함수는 waypoints_ 멤버 변수를 ENU 좌표로 채운다고 가정)
-  load_waypoints_0(csv_path);
-  load_waypoints_1(csv_path);
-  waypoints_ = _waypoints_0;
-
-  // --- 초기 Yaw 설정 (경로 0->1 방향): 초기 직진 방향 가이드용 ---
-  if (waypoints_.size() >= 2) {
-    size_t start_idx = 0; size_t next_idx = start_idx + 1;
-    if (start_idx < waypoints_.size() && next_idx < waypoints_.size()) {
-        double dx_init = waypoints_[next_idx].x - waypoints_[start_idx].x;
-        double dy_init = waypoints_[next_idx].y - waypoints_[start_idx].y;
-        if (std::abs(dx_init) > 1e-6 || std::abs(dy_init) > 1e-6) {
-            current_yaw_ = std::atan2(dy_init, dx_init);
-            //RCLCPP_INFO(this->get_logger(), "Set initial yaw guidance for straight driving: %.3f rad", current_yaw_);
-        } else { /* zero length segment */ }
-    } else { /* index out of bounds */ }
-  } else { /* not enough waypoints */ }
-
-  // 초기 Yaw 설정 로직은 compute_control 첫 호출 시 수행됨
-  std::string ns = "/truck" + std::to_string(actor_id_);
-  if(actor_id_ == 99) 
-  {
-    while(1)
-    {
-        //RCLCPP_INFO_STREAM(this->get_logger(),"No get NameSpace(argument) Please Re-start");
+    // Formation ID 설정
+    if(actor_id_ == 0) formation_id_ = 0;
+    else if(actor_id_ == 1) formation_id_ = 1;
+    else if(actor_id_ == 2) formation_id_ = 2;
+    else {
+        //RCLCPP_ERROR(this->get_logger(), "Invalid actor_id: %d", actor_id_);
+        throw std::runtime_error("Invalid actor_id");
     }
-  }
+    
+    if(actor_id_ == 1) current_wp_idx_ = 0;
+    if(actor_id_ == 2) current_wp_idx_ = 0;
 
-  // ROS 통신 설정 (namespace 덕분에 /truck0/gnss 등으로 구독합니다)
+    // --- 파라미터 선언 및 값 가져오기 ---
+    this->declare_parameter<std::string>("csv_path", "");
+    this->declare_parameter<double>("curve_lookahead_dist"); 
+    this->declare_parameter<double>("straight_lookahead_dist"); 
 
-  pub_vel_ = this->create_publisher<std_msgs::msg::Float64>(ns + "/velocity_control", 10);
-  pub_steer_ = this->create_publisher<std_msgs::msg::Float32>(ns + "/steer_control", 10);
-  pub_ENU_ = this->create_publisher<nav_msgs::msg::Odometry>(ns + "/ENU", 10 );
-  pub_lane_change_end_flag_ = this->create_publisher<std_msgs::msg::Bool>("/lane_change_end_flag", 10);
-  pub_reference_velocity_ = this->create_publisher<std_msgs::msg::Float64>(ns + "/reference_velocity", 10);
+    this->declare_parameter<double>("ACC_SPEED");     
+    this->declare_parameter<double>("SLOW_SPEED");     
+    this->declare_parameter<double>("STABLE_SPEED");     
 
-  // *changed
-  pub_formation_change_flag_ = this->create_publisher<std_msgs::msg::Int32>(ns + "/formation_change", 10);
+    this->declare_parameter<double>("WHEEL_BASE");    
+    this->declare_parameter<double>("MIN_GAP");
+    this->declare_parameter<double>("DESIRED_GAP");
+    this->declare_parameter<double>("EMERGENCY_GAP");
 
-  pub_ready_ = this->create_publisher<std_msgs::msg::UInt32>(ns + "/control_ready", 10);
+    // 군집 주행 관련 파라미터 선언
+    std::string csv_path;
 
-  // 자신의 위치 업데이트를 위한 구독
-  sub_server_enu_ = this->create_subscription<geometry_msgs::msg::Point>(
-    ns + "/server/enu", 10,
-    std::bind(&TruckController::server_enu_callback, this, std::placeholders::_1));
+    this->get_parameter("csv_path", csv_path);
+    this->get_parameter("curve_lookahead_dist", curve_lookahead_dist_);
+    this->get_parameter("straight_lookahead_dist", straight_lookahead_dist_);
 
-  // 모든 트럭의 위치 구독
-  std::string truck0_topic = "/truck0/server/enu";
-  std::string truck1_topic = "/truck1/server/enu";
-  std::string truck2_topic = "/truck2/server/enu";
+    this->get_parameter("ACC_SPEED", ACC_SPEED_);
+    this->get_parameter("SLOW_SPEED", SLOW_SPEED_);
+    this->get_parameter("STABLE_SPEED", STABLE_SPEED_);
 
-  // *changed
+    this->get_parameter("WHEEL_BASE", WHEEL_BASE_);
+    this->get_parameter("MIN_GAP", min_gap_);
+    this->get_parameter("DESIRED_GAP", desired_gap_);
+    this->get_parameter("EMERGENCY_GAP", emergency_gap_);
+
+
+    // --- 상태 변수 초기화 ---
+    prev_x_ = std::numeric_limits<double>::quiet_NaN(); // 이전 위치 없음 표시
+    prev_y_ = std::numeric_limits<double>::quiet_NaN();
+    start_x_ = std::numeric_limits<double>::quiet_NaN(); // 시작 위치는 아직 모름
+    start_y_ = std::numeric_limits<double>::quiet_NaN();
+    current_yaw_ = 0.0; // 초기 Yaw는 우선 0 또는 경로 방향으로 설정 (직진 유도용)
+
+    // 웨이포인트 로드 (이 함수는 waypoints_ 멤버 변수를 ENU 좌표로 채운다고 가정)
+    load_waypoints_0(csv_path);
+    load_waypoints_1(csv_path);
+    waypoints_ = _waypoints_0;
+
+    // --- 초기 Yaw 설정 (경로 0->1 방향): 초기 직진 방향 가이드용 ---
+    if (waypoints_.size() >= 2) {
+        size_t start_idx = 0; size_t next_idx = start_idx + 1;
+        if (start_idx < waypoints_.size() && next_idx < waypoints_.size()) {
+            double dx_init = waypoints_[next_idx].x - waypoints_[start_idx].x;
+            double dy_init = waypoints_[next_idx].y - waypoints_[start_idx].y;
+            if (std::abs(dx_init) > 1e-6 || std::abs(dy_init) > 1e-6) {
+                current_yaw_ = std::atan2(dy_init, dx_init);
+                //RCLCPP_INFO(this->get_logger(), "Set initial yaw guidance for straight driving: %.3f rad", current_yaw_);
+            } else { /* zero length segment */ }
+        } else { /* index out of bounds */ }
+    } else { /* not enough waypoints */ }
+
+    // 초기 Yaw 설정 로직은 compute_control 첫 호출 시 수행됨
+    std::string ns = "/truck" + std::to_string(actor_id_);
+    if(actor_id_ == 99) 
+    {
+        while(1)
+        {
+            //RCLCPP_INFO_STREAM(this->get_logger(),"No get NameSpace(argument) Please Re-start");
+        }
+    }
+
+    auto sensor_qos = rclcpp::QoS(rclcpp::KeepLast(1));
+    sensor_qos.best_effort();          // rmw_qos_profile_sensor_data와 유사
+    sensor_qos.durability_volatile();
+
+    // ROS 통신 설정 (namespace 덕분에 /truck0/gnss 등으로 구독합니다)
+    pub_vel_ = this->create_publisher<std_msgs::msg::Float64>(ns + "/velocity_control", 10);
+    pub_steer_ = this->create_publisher<std_msgs::msg::Float32>(ns + "/steer_control", 10);
+    pub_ENU_ = this->create_publisher<nav_msgs::msg::Odometry>(ns + "/ENU", 10 );
+    pub_lane_change_end_flag_ = this->create_publisher<std_msgs::msg::Bool>("/lane_change_end_flag", 10);
+    pub_reference_velocity_ = this->create_publisher<std_msgs::msg::Float64>(ns + "/reference_velocity", 10);
+
+    // *changed
+    pub_formation_change_flag_ = this->create_publisher<std_msgs::msg::Int32>(ns + "/formation_change", 10);
+
+    pub_ready_ = this->create_publisher<std_msgs::msg::UInt32>(ns + "/control_ready", 10);
+
+    // 현재 속도 구독 추가
+    sub_current_velocity_ = this->create_subscription<std_msgs::msg::Float32>( ns + "/velocity", sensor_qos, std::bind(&TruckController::current_velocity_callback, this, std::placeholders::_1));
+     
+    // *changed
     sub_truck0_velocity_ = this->create_subscription<std_msgs::msg::Float32>(
-        "/truck0/velocity", 10,
-        std::bind(&TruckController::truck0_velocity_callback, this, std::placeholders::_1));
+        "/truck0/velocity", sensor_qos, std::bind(&TruckController::truck0_velocity_callback, this, std::placeholders::_1));
 
     sub_truck1_velocity_ = this->create_subscription<std_msgs::msg::Float32>(
-        "/truck1/velocity", 10,
-        std::bind(&TruckController::truck1_velocity_callback, this, std::placeholders::_1));
+        "/truck1/velocity", sensor_qos, std::bind(&TruckController::truck1_velocity_callback, this, std::placeholders::_1));
 
     sub_truck2_velocity_ = this->create_subscription<std_msgs::msg::Float32>(
-        "/truck2/velocity", 10,
-        std::bind(&TruckController::truck2_velocity_callback, this, std::placeholders::_1));
+        "/truck2/velocity", sensor_qos, std::bind(&TruckController::truck2_velocity_callback, this, std::placeholders::_1));
 
-  sub_truck0_pos_ = this->create_subscription<geometry_msgs::msg::Point>(
-      truck0_topic, 10,
-      std::bind(&TruckController::truck0_pos_callback, this, std::placeholders::_1));
-  sub_truck1_pos_ = this->create_subscription<geometry_msgs::msg::Point>(
-      truck1_topic, 10,
-      std::bind(&TruckController::truck1_pos_callback, this, std::placeholders::_1));
-  sub_truck2_pos_ = this->create_subscription<geometry_msgs::msg::Point>(
-      truck2_topic, 10,
-      std::bind(&TruckController::truck2_pos_callback, this, std::placeholders::_1));
-      
-  // 현재 속도 구독 추가
-  sub_current_velocity_ = this->create_subscription<std_msgs::msg::Float32>(
-      ns + "/velocity", 10,
-      std::bind(&TruckController::current_velocity_callback, this, std::placeholders::_1));
-      
-  // Formation 변경 구독
-  sub_formation_end_change_ = this->create_subscription<std_msgs::msg::Bool>(
-      "/lane_change_end_flag", 10,
-      std::bind(&TruckController::formation_change_end_callback, this, std::placeholders::_1));
-  sub_formation_command_ = this->create_subscription<ros2_msg::msg::TruckCommand>(
-      ns + "/command", 10,
-      std::bind(&TruckController::formation_command_callback, this, std::placeholders::_1));
-  //sub_frame_ = this->create_subscription<std_msgs::msg::UInt32>("/sim/frame_id", 10, std::bind(&TruckController::on_frame_tick, this, std::placeholders::_1));
+    // 자신의 위치 업데이트를 위한 구독
+    sub_server_enu_ = this->create_subscription<geometry_msgs::msg::Point>( ns + "/server/enu", sensor_qos, std::bind(&TruckController::server_enu_callback, this, std::placeholders::_1));
 
-  // 200Hz 제어 타이머 추가
-  timer_ = this->create_wall_timer(
-      std::chrono::milliseconds(10),  // 200Hz = 5ms // 100Hz = 10ms
-      std::bind(&TruckController::compute_control, this));
+    sub_truck0_pos_ = this->create_subscription<geometry_msgs::msg::Point>(
+        "/truck0/server/enu", sensor_qos, std::bind(&TruckController::truck0_pos_callback, this, std::placeholders::_1));
+    sub_truck1_pos_ = this->create_subscription<geometry_msgs::msg::Point>(
+        "/truck1/server/enu", sensor_qos, std::bind(&TruckController::truck1_pos_callback, this, std::placeholders::_1));
+    sub_truck2_pos_ = this->create_subscription<geometry_msgs::msg::Point>(
+        "/truck2/server/enu", sensor_qos, std::bind(&TruckController::truck2_pos_callback, this, std::placeholders::_1));
       
-  //RCLCPP_INFO(this->get_logger(), "TruckController node initialized (IMU-less GPS Steer Mode). Yaw will be initialized on first control cycle.");
+    // Formation 변경 구독
+    sub_formation_end_change_ = this->create_subscription<std_msgs::msg::Bool>("/lane_change_end_flag", 10, std::bind(&TruckController::formation_change_end_callback, this, std::placeholders::_1));
+    sub_formation_command_ = this->create_subscription<ros2_msg::msg::TruckCommand>( ns + "/command", 10, std::bind(&TruckController::formation_command_callback, this, std::placeholders::_1));
+    sub_frame_ = this->create_subscription<std_msgs::msg::UInt32>("/sim/frame_id", 10, std::bind(&TruckController::on_frame_tick, this, std::placeholders::_1));
+
+    // 200Hz 제어 타이머 추가
+    // timer_ = this->create_wall_timer(
+    //     std::chrono::milliseconds(10),  // 200Hz = 5ms // 100Hz = 10ms
+    //     std::bind(&TruckController::compute_control, this));
+    
+    //RCLCPP_INFO(this->get_logger(), "TruckController node initialized (IMU-less GPS Steer Mode). Yaw will be initialized on first control cycle.");
 
 
 
 } // 생성자 끝
 
-// void TruckController::on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg)
-// {
-//     uint32_t frame_id = msg->data;
+void TruckController::on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg)
+{
+    const uint32_t frame_id = msg->data;
+    std::lock_guard<std::mutex> lock(ready_mtx_);
 
-//     //로그로 프레임 확인
-//     RCLCPP_DEBUG(this->get_logger(), "Frame %u tick received", frame_id);
+    // 1) 이번 프레임으로 업데이트
+    uint32_t prev_frame = ready_.frame_id;
+    ready_.frame_id = frame_id;
+    ready_.computed = false;
+}
 
-//     // tick마다 제어 함수 1회 실행
-//     this->compute_control();
-// }
+bool TruckController::all_inputs_ready() const
+{
+    std::lock_guard<std::mutex> lock(ready_mtx_);
+    const uint32_t f = ready_.frame_id;
 
+    // 아직 한 번도 frame을 못 받았으면 아무것도 하지 말자
+    if (f == 0) return false;
+
+    bool ok =
+        ready_.t0_enu == f &&
+        ready_.t1_enu == f &&
+        ready_.t2_enu == f &&
+        ready_.t0_vel == f &&
+        ready_.t1_vel == f &&
+        ready_.t2_vel == f &&
+        !ready_.computed;
+
+    return ok;
+}
 // ENU 위치 수신 콜백: 위치 업데이트 후 제어 함수 호출
 void TruckController::server_enu_callback(const geometry_msgs::msg::Point::SharedPtr msg)
 {
@@ -272,6 +275,14 @@ void TruckController::formation_command_callback(const ros2_msg::msg::TruckComma
 // 상태 기반 제어 로직
 void TruckController::compute_control()
 {
+    {
+        std::lock_guard<std::mutex> lock(ready_mtx_);
+        ready_.computed = true;  
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Start computing control for frame %d", ready_.frame_id);
+    
+
     if (std::isnan(cur_x_) || waypoints_.empty()) {
         //RCLCPP_WARN_ONCE(this->get_logger(), "Waiting for valid position or waypoints.");
         return;
@@ -497,7 +508,7 @@ void TruckController::compute_control()
         {
             // *changed
             //if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
-            // if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
+             if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
             //if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
             //if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
              if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
@@ -1040,12 +1051,18 @@ void TruckController::truck0_pos_callback(const geometry_msgs::msg::Point::Share
     truck_positions_[0].x = msg->x;
     truck_positions_[0].y = msg->y;
     truck_positions_[0].z = msg->z;
+    {
+        std::lock_guard<std::mutex> lock(ready_mtx_);
+        ready_.t0_enu = ready_.frame_id;
+    }
+    if (all_inputs_ready()) {
+        compute_control();
+    }
+
 }
 
 void TruckController::truck1_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg) {
     if (!msg || std::isnan(msg->x) || std::isnan(msg->y) || std::isnan(msg->z)) {
-       // RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-          //  "Received invalid position data for truck1");
         return;
     }
     
@@ -1055,8 +1072,6 @@ void TruckController::truck1_pos_callback(const geometry_msgs::msg::Point::Share
         double dy = msg->y - truck_positions_[1].y;
         double dist = std::sqrt(dx*dx + dy*dy);
         if (dist > 100.0) {
-          //  RCLCPP_WARN(this->get_logger(), 
-               // "Detected suspicious position jump for truck1: %.2f meters", dist);
             return;
         }
     }
@@ -1064,12 +1079,17 @@ void TruckController::truck1_pos_callback(const geometry_msgs::msg::Point::Share
     truck_positions_[1].x = msg->x;
     truck_positions_[1].y = msg->y;
     truck_positions_[1].z = msg->z;
+    {
+        std::lock_guard<std::mutex> lock(ready_mtx_);
+        ready_.t1_enu = ready_.frame_id;
+    }
+    if (all_inputs_ready()) {
+        compute_control();
+    }
 }
 
 void TruckController::truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg) {
     if (!msg || std::isnan(msg->x) || std::isnan(msg->y) || std::isnan(msg->z)) {
-      //  RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-           // "Received invalid position data for truck2");
         return;
     }
     
@@ -1079,8 +1099,6 @@ void TruckController::truck2_pos_callback(const geometry_msgs::msg::Point::Share
         double dy = msg->y - truck_positions_[2].y;
         double dist = std::sqrt(dx*dx + dy*dy);
         if (dist > 100.0) {
-          //  RCLCPP_WARN(this->get_logger(), 
-              //  "Detected suspicious position jump for truck2: %.2f meters", dist);
             return;
         }
     }
@@ -1088,6 +1106,13 @@ void TruckController::truck2_pos_callback(const geometry_msgs::msg::Point::Share
     truck_positions_[2].x = msg->x;
     truck_positions_[2].y = msg->y;
     truck_positions_[2].z = msg->z;
+    {
+        std::lock_guard<std::mutex> lock(ready_mtx_);
+        ready_.t2_enu = ready_.frame_id;
+    }
+        if (all_inputs_ready()) {
+        compute_control();
+    }
 }
 
 // 현재 포메이션 기준 선행 차량과의 거리 계산
@@ -1135,19 +1160,41 @@ void TruckController::truck0_velocity_callback(const std_msgs::msg::Float32::Sha
 {   
     truck0_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
     if(truck0_velocity_ > 95) truck0_overspeed_flag_ = true;
-}
+    {
+        std::lock_guard<std::mutex> lock(ready_mtx_);
+        ready_.t0_vel = ready_.frame_id;
+    }
 
+    if (all_inputs_ready()) {
+        compute_control();
+    }
+
+}
 
 void TruckController::truck1_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg)
 {   
     truck1_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
     if(truck1_velocity_ > 95) truck1_overspeed_flag_ = true;
+    {
+        std::lock_guard<std::mutex> lock(ready_mtx_);
+        ready_.t1_vel = ready_.frame_id;
+    }
+    if (all_inputs_ready()) {
+        compute_control();
+    }
 }
 
 void TruckController::truck2_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg)
 {   
     truck2_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
-    if(truck1_velocity_ > 95) truck2_overspeed_flag_ = true;
+    if(truck2_velocity_ > 95) truck2_overspeed_flag_ = true;
+    {
+        std::lock_guard<std::mutex> lock(ready_mtx_);
+        ready_.t2_vel = ready_.frame_id;
+    }
+    if (all_inputs_ready()) {
+        compute_control();
+    }
 }
 
 bool TruckController::check_stable_speeds()

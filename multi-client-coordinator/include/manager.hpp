@@ -133,7 +133,7 @@ private:
     // --- E1 profiler additions ---
     std::ofstream prof_csv_;
     std::string prof_path_ = "/home/avees/ros2_ws/src/test_truck/e1_profiler.csv";
-    uint64_t warmup_frames_ = 1000;
+    uint64_t warmup_frames_ = 300;
 
     std::chrono::steady_clock::time_point t0_{};
     bool t0_init_ = false;

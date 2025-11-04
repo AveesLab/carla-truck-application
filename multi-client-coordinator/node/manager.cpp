@@ -18,11 +18,14 @@ SyncManager::SyncManager(): Node("sync_manager_node"), registration_(10,false), 
     
     //------------Parameters------------
     declare_parameter<double>("dt_second", 0.04);
-    declare_parameter<double>("sub_dt_second", 0.01);
+    //declare_parameter<double>("sub_dt_second", 0.01);
     declare_parameter<int>("num_of_sub_dt", 4);
     const double dt_value  = get_parameter("dt_second").as_double();
-    const double sub_dt_value  = get_parameter("sub_dt_second").as_double();
+    //const double sub_dt_value  = get_parameter("sub_dt_second").as_double();
     const int num_of_sub_dt  = get_parameter("num_of_sub_dt").as_int();
+
+    const int    clamped_sub_dt = (num_of_sub_dt > 0) ? num_of_sub_dt : 1;
+    const double sub_dt = dt_value / static_cast<double>(clamped_sub_dt);
     
     //------------Setting QOS------------
     rclcpp::QoS custom_qos(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
@@ -51,13 +54,15 @@ SyncManager::SyncManager(): Node("sync_manager_node"), registration_(10,false), 
     //world = new cc::World(client->ReloadWorld(true));
     settings = world->GetSettings();
     settings.synchronous_mode = true;
-    //settings.fixed_delta_seconds = 0.04;
-    //settings.max_substep_delta_time = 0.01;
-    //settings.max_substeps = 4;
+    // settings.fixed_delta_seconds = 0.04;
+    // settings.max_substep_delta_time = 0.01;
+    // settings.max_substeps = 4;
     settings.fixed_delta_seconds = static_cast<float>(dt_value);
-    settings.max_substep_delta_time = static_cast<float>(sub_dt_value);
-    settings.max_substeps = num_of_sub_dt;
-    //settings.no_rendering_mode = true; 
+    settings.max_substep_delta_time  = static_cast<float>(sub_dt);
+    settings.max_substeps            = clamped_sub_dt;
+    // settings.max_substep_delta_time = static_cast<float>(sub_dt_value);
+    // settings.max_substeps = num_of_sub_dt;
+    // settings.no_rendering_mode = true; 
     world->ApplySettings(settings,time_);
     
     //------------Save Delta t value(s/ms/ns)------------
@@ -88,7 +93,7 @@ SyncManager::SyncManager(): Node("sync_manager_node"), registration_(10,false), 
         recordData();
     });
     
-    RCLCPP_INFO(get_logger(), "Initialize Finish using dt_second = %.3f sec", dt_value);
+    RCLCPP_INFO(get_logger(),"Initialize Finish: fixed=%.3f s (%.1f ms), max_substep_dt=%.3f s (%.2f ms), max_substeps=%d", dt_value, dt_value * 1000.0, sub_dt,  sub_dt * 1000.0, clamped_sub_dt);
 }
 
 
@@ -278,8 +283,11 @@ bool SyncManager::sync_received()
     return true;
 
 }
+
 void SyncManager::managerInThread() 
 {
+    int last_frame = -1;
+
     while (isNodeRunning_) 
     {
         if (check_register()) 
@@ -293,24 +301,29 @@ void SyncManager::managerInThread()
 
             if (sync_received()) 
             {
-                // 지금 시각(ns)
-                using clock = std::chrono::steady_clock;
-                using ns    = std::chrono::nanoseconds;
-                auto now_tp = std::chrono::time_point_cast<ns>(clock::now());
-                int64_t now_ns = now_tp.time_since_epoch().count();
-                last_sync_finish_ns_.store(now_ns, std::memory_order_release);
+                auto current_frame = frame_k.load(std::memory_order_acquire);
 
-                // tick 시작 시각 읽기
-                int64_t tick_ns = last_tick_start_ns_.load(std::memory_order_acquire);
-                if (tick_ns != 0) 
+                if (current_frame != last_frame) 
                 {
-                    double latency_ms = double(now_ns - tick_ns) / 1e6;  // ms로 변환
-                    RCLCPP_INFO(this->get_logger(),
-                        "[SYNC] control path latency = %.3f ms", latency_ms);
+                    // 지금 시각(ns)
+                    using clock = std::chrono::steady_clock;
+                    using ns    = std::chrono::nanoseconds;
+                    auto now_tp = std::chrono::time_point_cast<ns>(clock::now());
+                    int64_t now_ns = now_tp.time_since_epoch().count();
+                    last_sync_finish_ns_.store(now_ns, std::memory_order_release);
+
+                    // tick 시작 시각 읽기
+                    int64_t tick_ns = last_tick_start_ns_.load(std::memory_order_acquire);
+                    if (tick_ns != 0) 
+                    {
+                        double latency_ms = double(now_ns - tick_ns) / 1e6;  // ms로 변환
+                        RCLCPP_INFO(this->get_logger(), "[SYNC : Frame %d] control path latency = %.3f ms", current_frame, latency_ms);
+                    }
+                    
+                    go_time = true;
+                    tick_request_ = true; // ✅ 별도 tick thread에서 처리할 flag
+                    last_frame = current_frame;
                 }
-                
-                go_time = true;
-                tick_request_ = true; // ✅ 별도 tick thread에서 처리할 flag
             }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1)); // 최소 부하
@@ -319,7 +332,8 @@ void SyncManager::managerInThread()
 
 void SyncManager::tickSchedulerThread()
 {
-    try {
+    try 
+    {
         using clock = std::chrono::steady_clock;
         using ns    = std::chrono::nanoseconds;
         using TP    = std::chrono::time_point<clock, ns>;
@@ -330,11 +344,19 @@ void SyncManager::tickSchedulerThread()
         bool first_deadline_init = false;
         TP t0, first_deadline;
 
+        static uint32_t prev_frame = 0;
+        static TP       prev_t_start;
+        static TP       prev_deadline_tp;
+
         while (isNodeRunning_) 
         {
             std::this_thread::sleep_until(next_deadline);
             const TP t_start = std::chrono::time_point_cast<ns>(clock::now());
             last_tick_start_ns_.store(t_start.time_since_epoch().count(), std::memory_order_release);
+
+            if (prev_frame != 0) {
+                recordTiming(prev_frame, prev_t_start, prev_deadline_tp, period_ns_, t0, first_deadline);
+            }
 
             if (!t0_init) {
                 t0 = t_start;
@@ -345,16 +367,14 @@ void SyncManager::tickSchedulerThread()
                 first_deadline_init = true;
             }
 
-            const ns gap_to_deadline = t_start - next_deadline;
-            const double gap_ms = static_cast<double>(gap_to_deadline.count()) / 1e6;
-
-            const bool had_sync = tick_request_.exchange(false, std::memory_order_acq_rel);
-            if (!had_sync) {
-                RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000,"[Tick] No control-sync before deadline (ZOH).");
-            }
-
+        
+            auto t_before = std::chrono::time_point_cast<ns>(clock::now());
+            RCLCPP_INFO(this->get_logger(), "[Tick %u] before Tick(): %.6f s", frame_k.load(), double(t_before.time_since_epoch().count()) / 1e9);
             // 실제 step
             world->Tick(time_);
+
+            auto t_after = std::chrono::time_point_cast<ns>(clock::now());
+            RCLCPP_INFO(this->get_logger(), "[Tick %u] after Tick(): %.6f s  (Δ=%.3f ms)",frame_k.load(),double(t_after.time_since_epoch().count()) / 1e9,double((t_after - t_before).count()) / 1e6);
 
             // frame publish
             const uint32_t k = frame_k.fetch_add(1) + 1;
@@ -362,7 +382,9 @@ void SyncManager::tickSchedulerThread()
             frame_msg.data = k;
             FramePub_->publish(frame_msg);
 
-			recordTiming(k, t_start, next_deadline, period_ns_, t0, first_deadline);
+            prev_frame       = k;
+            prev_t_start     = t_start;
+            prev_deadline_tp = next_deadline;
 
             next_deadline += period_ns_;
         }
@@ -381,26 +403,36 @@ void SyncManager::recordTiming(uint32_t frame, const std::chrono::steady_clock::
     const auto gap_to_deadline = t_start - prev_deadline;
     const double gap_ms = double(duration_cast<nanoseconds>(gap_to_deadline).count()) / 1e6;
     
-    // ) 전체 경과 (t0 이후 실제로 지난 시간)
+    // 2) 전체 경과
     const double wall_elapsed_ms = duration<double, std::milli>(t_start - t0).count();
 
-    // 3) 이상적인 경과 (first_deadline 이후 deadline 기준으로 지난 시간)
+    // 3) 이상적인 경과
     const double ideal_elapsed_ms = duration<double, std::milli>(prev_deadline - first_deadline).count();
 
     // 4) drift
     const double drift_ms = wall_elapsed_ms - ideal_elapsed_ms;
 
-    // 5) control latency (tick 시작 ~ sync 끝)
+    // 5) control latency (이전 tick 시작 ~ sync 끝)
     double ctrl_latency_ms = 0.0;
     {
-        int64_t sync_ns = last_sync_finish_ns_.load(std::memory_order_acquire);
-        int64_t tick_ns = last_tick_start_ns_.load(std::memory_order_acquire);
-        if (sync_ns > tick_ns && tick_ns != 0)
-        {
+        // ✅ 여기서는 전역 말고, 이 프레임의 tick 시작시각(t_start)을 직접 쓴다
+        const int64_t tick_ns = t_start.time_since_epoch().count();
+        const int64_t sync_ns = last_sync_finish_ns_.load(std::memory_order_acquire);
+
+        if (sync_ns > tick_ns && tick_ns != 0) {
             ctrl_latency_ms = double(sync_ns - tick_ns) / 1e6;
         }
-    }
 
+        // 여기서 진짜 deadline 검사도 같이 해버릴 수 있음
+        const int64_t deadline_ns = prev_deadline.time_since_epoch().count();
+        const int64_t control_deadline_ns = deadline_ns + period_ns.count();
+
+
+        if (frame > warmup_frames_ && sync_ns != 0 && sync_ns > control_deadline_ns) {
+            RCLCPP_WARN(this->get_logger(), "[Tick] frame %u: No control-sync before deadline (ZOH).", frame);
+        }
+
+    }
     // 6) CSV 출력
     if (prof_csv_.is_open()) {
         prof_csv_ << frame << ","
@@ -411,8 +443,7 @@ void SyncManager::recordTiming(uint32_t frame, const std::chrono::steady_clock::
                   << drift_ms << ","
                   << ctrl_latency_ms << "\n";
     }
-
-    // 7) 통계 집계도 여기서 같이
+    // 7) 통계
     if (frame > warmup_frames_) {
         gaps_ms_.push_back(gap_ms);
         drift_ms_.push_back(drift_ms);
