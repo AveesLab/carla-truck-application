@@ -32,6 +32,8 @@ class CarlaTickMaster(Node):
         settings = self.world.get_settings()
         settings.synchronous_mode = True
         settings.fixed_delta_seconds = 0.02  # 50 Hz
+        settings.max_substep_delta_time = 0.01
+        settings.max_substeps = 2
         self.world.apply_settings(settings)
 
         applied = self.world.get_settings()

@@ -8,59 +8,36 @@ static auto &RandomChoice(const RangeT &range, RNG &&generator) {
   return range[dist(std::forward<RNG>(generator))];
 }
 
-SyncManager::SyncManager(): Node("sync_manager_node"), registration_(10,false), sync_throttle(10,false), sync_steer(10,false) 
+bool go_time = false;
+
+// manager.cpp
+
+SyncManager::SyncManager()
+: Node("sync_manager_node"), registration_(10,false), sync_throttle(10,false), sync_steer(10,false)
 {
-
-	//------------Connect CARLA------------
-    client = new cc::Client(host, port);
-    world = new cc::World(client->GetWorld());
-    client->SetTimeout(10s);
-    
-    //------------Parameters------------
+    // 1) params
     declare_parameter<double>("dt_second", 0.04);
-    declare_parameter<double>("sub_dt_second", 0.01);
-    declare_parameter<int>("num_of_sub_dt", 4);
+    declare_parameter<std::string>("prof_path", prof_path_);
+    declare_parameter<int>("warmup_frames", static_cast<int>(warmup_frames_));
+
     const double dt_value  = get_parameter("dt_second").as_double();
-    const double sub_dt_value  = get_parameter("sub_dt_second").as_double();
-    const int num_of_sub_dt  = get_parameter("num_of_sub_dt").as_int();
-    
-    //------------Setting QOS------------
-    rclcpp::QoS custom_qos(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
-    custom_qos.reliable();
-	
-	//------------ROS Topic ------------
-    TruckSizeSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/numtruckss", 10, std::bind(&SyncManager::TruckSizeSubCallback, this, std::placeholders::_1));
-    RegistrationSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/registration", 10, std::bind(&SyncManager::RegistrationSubCallback, this, std::placeholders::_1));
-    SyncThrottleSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/sync_throttle", 10, std::bind(&SyncManager::SyncThrottleSubCallback, this, std::placeholders::_1));
-    SyncSteerSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/sync_steer", 10, std::bind(&SyncManager::SyncSteerSubCallback, this, std::placeholders::_1));
-    SyncEnuSubscriber_ = this->create_subscription<geometry_msgs::msg::Point>("truck0/server/enu", 10, [&](const geometry_msgs::msg::Point::SharedPtr msg){
-        enu = true;
-    });
+    prof_path_             = get_parameter("prof_path").as_string();
+    warmup_frames_         = static_cast<uint64_t>(get_parameter("warmup_frames").as_int());
 
-    //Steer
-    LVSteerSubscriber_ = this->create_subscription<std_msgs::msg::Float32>("/truck0/steer_control", custom_qos, std::bind(&SyncManager::LVSteerSubCallback, this, std::placeholders::_1));
-    FV1SteerSubscriber_ = this->create_subscription<std_msgs::msg::Float32>("/truck1/steer_control", custom_qos, std::bind(&SyncManager::FV1SteerSubCallback, this, std::placeholders::_1));
-    FV2SteerSubscriber_ = this->create_subscription<std_msgs::msg::Float32>("/truck2/steer_control", custom_qos, std::bind(&SyncManager::FV2SteerSubCallback, this, std::placeholders::_1));
+    // 2) CARLA
+    client = new cc::Client(host, port);
+    client->SetTimeout(10s);
+    world = new cc::World(client->GetWorld());
 
-    ShutdownPublisher_ = this->create_publisher<std_msgs::msg::String>("/shutdown_topic",10);
-    isNodeRunning_ = true;
-    TarPub_ = this->create_publisher<ros2_msg::msg::Target>("/truck0/target",10);
-    FramePub_ = this->create_publisher<std_msgs::msg::UInt32>("/sim/frame_id", 10);
-    
-	//------------Setting Synchronous mode------------
-    //world = new cc::World(client->ReloadWorld(true));
+    // 3) CARLA settings
     settings = world->GetSettings();
-    settings.synchronous_mode = true;
-    //settings.fixed_delta_seconds = 0.04;
-    //settings.max_substep_delta_time = 0.01;
-    //settings.max_substeps = 4;
-    settings.fixed_delta_seconds = static_cast<float>(dt_value);
-    settings.max_substep_delta_time = static_cast<float>(sub_dt_value);
-    settings.max_substeps = num_of_sub_dt;
-    //settings.no_rendering_mode = true; 
-    world->ApplySettings(settings,time_);
-    
-    //------------Save Delta t value(s/ms/ns)------------
+    settings.synchronous_mode       = true;
+    settings.fixed_delta_seconds    = static_cast<float>(dt_value);
+    settings.max_substep_delta_time = 0.01f;
+    settings.max_substeps           = 4;
+    world->ApplySettings(settings, time_);
+
+    // 4) period 계산을 멤버에 저장
     using ns = std::chrono::nanoseconds;
     const double dt_s = settings.fixed_delta_seconds.get_value_or(dt_value);
     period_ns_        = std::chrono::duration_cast<ns>(std::chrono::duration<double>(dt_s));
@@ -69,49 +46,98 @@ SyncManager::SyncManager(): Node("sync_manager_node"), registration_(10,false), 
     if (period_ns_.count() <= 0) {
         RCLCPP_ERROR(get_logger(), "Invalid fixed_delta_seconds=%.6f", settings.fixed_delta_seconds);
     }
-    
-    
-    //------------Open .csv------------
-    prof_csv_.open(prof_path_, std::ios::out | std::ios::trunc);
-	if (prof_csv_.is_open()) {
-		prof_csv_ << "frame,gap_to_deadline_ms,wall_elapsed_ms,ideal_elapsed_ms,drift_ms,ctrl_latency_ms\n";
-	}
-    
-    //------------Create Thread------------
-    manager_thread_ = std::thread(&SyncManager::managerInThread, this);
-	tick_thread_ = std::thread(&SyncManager::tickSchedulerThread, this);
 
-    callback_id = world->OnTick([&](cc::WorldSnapshot snapshot) 
-    {
-		sim_time = snapshot.GetTimestamp().elapsed_seconds;
+    // 5) CSV open (한 번만)
+    prof_csv_.open(prof_path_, std::ios::out | std::ios::trunc);
+    if (prof_csv_.is_open()) {
+        prof_csv_ << "frame,gap_to_deadline_ms,wall_elapsed_ms,ideal_elapsed_ms,drift_ms\n";
+        RCLCPP_INFO(get_logger(), "[E1] profiler csv opened: %s", prof_path_.c_str());
+    } else {
+        RCLCPP_WARN(get_logger(), "[E1] Cannot open profiler csv: %s", prof_path_.c_str());
+    }
+
+    // 6) 실행 플래그
+    isNodeRunning_ = true;
+
+    // 7) manager thread 먼저
+    manager_thread_ = std::thread(&SyncManager::managerInThread, this);
+
+    // 8) tick thread (멤버 period_ns_ 사용)
+    tick_thread_ = std::thread(&SyncManager::tickSchedulerThread, this);
+
+    // 9) OnTick 콜백
+    callback_id = world->OnTick([&](cc::WorldSnapshot snapshot) {
+        sim_time = snapshot.GetTimestamp().elapsed_seconds;
         if (!(registered && first && go_time && enu)) return;
         recordData();
     });
-    
+
     RCLCPP_INFO(get_logger(), "Initialize Finish using dt_second = %.3f sec", dt_value);
 }
 
 
-SyncManager::~SyncManager(void)
+
+
+SyncManager::~SyncManager() 
 {
+    // 1) 먼저 실행 정지 신호
     isNodeRunning_ = false;
-    
+
+
+    // 2) 스레드 join (둘 다!)
     if (manager_thread_.joinable()) manager_thread_.join();
     if (tick_thread_.joinable())    tick_thread_.join();
-    
-    //---------OnTick 콜백 제거---------
+
+    // 3) OnTick 콜백 제거 (등록되어 있다면)
     if (world && callback_id) {
         try { world->RemoveOnTick(callback_id); }
         catch (...) { /* ignore */ }
     }
-    
-    //---------Sync 모드 종료---------
+
+    // 4) (이제 아무도 쓰지 않음) 요약 통계 & CSV close
+    auto pct = [](std::vector<double> v, double p)->double {
+        if (v.empty()) return std::numeric_limits<double>::quiet_NaN();
+        std::sort(v.begin(), v.end());
+        const double idx = std::clamp(p * (v.size() - 1), 0.0, double(v.size()-1));
+        const size_t i = size_t(idx);
+        const double frac = idx - i;
+        return (i+1 < v.size()) ? v[i]*(1.0-frac) + v[i+1]*frac : v[i];
+    };
+
+    if (analyzed_frames_ > 0) {
+        const double p50   = pct(gaps_ms_, 0.50);
+        const double p90   = pct(gaps_ms_, 0.90);
+        const double p99   = pct(gaps_ms_, 0.99);
+        const double p999  = pct(gaps_ms_, 0.999);
+        const double max_v = *std::max_element(gaps_ms_.begin(), gaps_ms_.end());
+        const double overp = 100.0 * double(over_cnt_) / double(analyzed_frames_);
+        const double drift_final = drift_ms_.empty() ? 0.0 : drift_ms_.back();
+
+        RCLCPP_INFO(this->get_logger(),
+            "[E1] Δt=%.1f ms | frames=%lu | Over%%=%.5f | P50=%.3f | P90=%.3f | P99=%.3f | P99.9=%.3f | Max=%.3f | Drift_final=%.3f ms",
+            period_ms_, analyzed_frames_, overp, p50, p90, p99, p999, max_v, drift_final);
+
+        // if (prof_csv_.is_open()) {
+        //     prof_csv_ << "# SUMMARY,Dt_ms," << period_ms_
+        //               << ",Frames," << analyzed_frames_
+        //               << ",Over_pct," << overp
+        //               << ",P50,"  << p50
+        //               << ",P90,"  << p90
+        //               << ",P99,"  << p99
+        //               << ",P99.9,"<< p999
+        //               << ",Max,"  << max_v
+        //               << ",Drift_final_ms," << drift_final << "\n";
+        // }
+    }
+    if (prof_csv_.is_open()) { prof_csv_.flush(); prof_csv_.close(); }
+
+    // 5) CARLA를 비동기 모드로 되돌리기 (스레드 종료 후!!)
     try {
         settings.synchronous_mode = false;
         if (world) world->ApplySettings(settings, time_);
     } catch (...) {}
 
-    ////--------Actor 정리---------
+    // 6) 액터 정리
     try {
         auto actor_list = world ? world->GetActors() : nullptr;
         if (actor_list) {
@@ -126,7 +152,7 @@ SyncManager::~SyncManager(void)
         }
     } catch (...) {}
 
-    ////---------World/Client 메모리 해제---------
+    // 7) world/client 메모리 해제 (또는 unique_ptr로 관리 권장)
     delete world;
     world = nullptr;
     delete client;
@@ -134,6 +160,7 @@ SyncManager::~SyncManager(void)
 
     std::cerr << "pub shutdown" << std::endl;
 }
+
 
 
 void SyncManager::TruckSizeSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -150,7 +177,6 @@ void SyncManager::RegistrationSubCallback(const std_msgs::msg::Int32::SharedPtr 
     registration_[msg->data] = true;
 }
 
-
 void SyncManager::LVSteerSubCallback(const std_msgs::msg::Float32::SharedPtr msg) {
     lv_steer = msg->data;
 }
@@ -162,7 +188,6 @@ void SyncManager::FV1SteerSubCallback(const std_msgs::msg::Float32::SharedPtr ms
 void SyncManager::FV2SteerSubCallback(const std_msgs::msg::Float32::SharedPtr msg) {
     fv2_steer = msg->data;
 }
-
 
 void SyncManager::SyncThrottleSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
     unique_lock<mutex> lock(mutex_);
@@ -176,7 +201,7 @@ void SyncManager::SyncSteerSubCallback(const std_msgs::msg::Int32::SharedPtr msg
 
 bool SyncManager::check_register() 
 {
-    if(size == 0) return false;
+    if(size == 0 ) return false;
     if(registered) return true;
     unique_lock<mutex> lock(mutex_);
     for(int i = 0; i<size; i++) 
@@ -189,6 +214,7 @@ bool SyncManager::check_register()
         //world->Tick(time_);
         
         std_msgs::msg::UInt32 frame_msg;
+        //frame_msg.data = static_cast<uint32_t>(sim_time / 40.0f); // 또는 frame counter
         frame_msg.data = frame_k.load();
         FramePub_->publish(frame_msg);
         
@@ -242,42 +268,6 @@ void SyncManager::FindAllTruck()
     }
 }
 
-
-bool SyncManager::sync_received() 
-{
-    unique_lock<mutex> lock(mutex_);
-    // sync_throttle 배열의 모든 원소가 true인지 확인
-    for (int i = 0; i < size; i++) 
-    {
-        if (sync_throttle[i] == false) 
-        {
-            return false; // 하나라도 false면 false 반환
-        }
-    }
-
-    // sync_steer 배열의 모든 원소가 true인지 확인
-    for (int i = 0; i < size; i++) 
-    {
-        if (sync_steer[i] == false) 
-        {
-            return false; // 하나라도 false면 false 반환
-        }
-    }
-
-    //all received
-    for(int i = 0; i<size; i++) 
-    {
-        sync_throttle[i] = false;
-    }
-    for(int i = 0; i<size; i++) 
-    {
-        sync_steer[i] = false;
-    }
-    
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    return true;
-
-}
 void SyncManager::managerInThread() 
 {
     while (isNodeRunning_) 
@@ -302,8 +292,7 @@ void SyncManager::managerInThread()
 
                 // tick 시작 시각 읽기
                 int64_t tick_ns = last_tick_start_ns_.load(std::memory_order_acquire);
-                if (tick_ns != 0) 
-                {
+                if (tick_ns != 0) {
                     double latency_ms = double(now_ns - tick_ns) / 1e6;  // ms로 변환
                     RCLCPP_INFO(this->get_logger(),
                         "[SYNC] control path latency = %.3f ms", latency_ms);
@@ -362,7 +351,42 @@ void SyncManager::tickSchedulerThread()
             frame_msg.data = k;
             FramePub_->publish(frame_msg);
 
-			recordTiming(k, t_start, next_deadline, period_ns_, t0, first_deadline);
+
+            // drift 계산
+            const double wall_elapsed_ms = std::chrono::duration<double, std::milli>(t_start - t0).count();
+            const TP prev_deadline = next_deadline - period_ns_;
+            const double ideal_elapsed_ms = std::chrono::duration<double, std::milli>(prev_deadline - first_deadline).count();
+            const double drift_ms = wall_elapsed_ms - ideal_elapsed_ms;
+            double ctrl_latency_ms = 0.0;
+            {
+                int64_t sync_ns = last_sync_finish_ns_.load(std::memory_order_acquire);
+                int64_t tick_ns = last_tick_start_ns_.load(std::memory_order_acquire);
+                if (sync_ns > tick_ns && tick_ns != 0) {
+                    ctrl_latency_ms = double(sync_ns - tick_ns) / 1e6;
+                }
+            }
+
+            
+            if (prof_csv_.is_open()) 
+            {
+                prof_csv_ << k << ","
+                        << std::fixed << std::setprecision(6)
+                        << gap_ms << ","
+                        << wall_elapsed_ms << ","
+                        << ideal_elapsed_ms << ","
+                        << drift_ms << ","
+                        << ctrl_latency_ms << "\n";   // ← 새 칼럼
+            }
+
+            // 통계 집계
+            if (k > warmup_frames_) {
+                gaps_ms_.push_back(gap_ms);
+                drift_ms_.push_back(drift_ms);
+                analyzed_frames_++;
+                if (gap_to_deadline.count() > 0) {
+                    over_cnt_++;
+                }
+            }
 
             next_deadline += period_ns_;
         }
@@ -372,57 +396,34 @@ void SyncManager::tickSchedulerThread()
     }
 }
 
-void SyncManager::recordTiming(uint32_t frame, const std::chrono::steady_clock::time_point& t_start, const std::chrono::steady_clock::time_point& prev_deadline,
-    const std::chrono::nanoseconds& period_ns, const std::chrono::steady_clock::time_point& t0, const std::chrono::steady_clock::time_point& first_deadline)
-{
-    using namespace std::chrono;
 
-    // 1) deadline 대비 gap
-    const auto gap_to_deadline = t_start - prev_deadline;
-    const double gap_ms = double(duration_cast<nanoseconds>(gap_to_deadline).count()) / 1e6;
-    
-    // ) 전체 경과 (t0 이후 실제로 지난 시간)
-    const double wall_elapsed_ms = duration<double, std::milli>(t_start - t0).count();
-
-    // 3) 이상적인 경과 (first_deadline 이후 deadline 기준으로 지난 시간)
-    const double ideal_elapsed_ms = duration<double, std::milli>(prev_deadline - first_deadline).count();
-
-    // 4) drift
-    const double drift_ms = wall_elapsed_ms - ideal_elapsed_ms;
-
-    // 5) control latency (tick 시작 ~ sync 끝)
-    double ctrl_latency_ms = 0.0;
-    {
-        int64_t sync_ns = last_sync_finish_ns_.load(std::memory_order_acquire);
-        int64_t tick_ns = last_tick_start_ns_.load(std::memory_order_acquire);
-        if (sync_ns > tick_ns && tick_ns != 0)
-        {
-            ctrl_latency_ms = double(sync_ns - tick_ns) / 1e6;
+bool SyncManager::sync_received() {
+    unique_lock<mutex> lock(mutex_);
+    // sync_throttle 배열의 모든 원소가 true인지 확인
+    for (int i = 0; i < size; i++) {
+        if (sync_throttle[i] == false) {
+            return false; // 하나라도 false면 false 반환
         }
     }
 
-    // 6) CSV 출력
-    if (prof_csv_.is_open()) {
-        prof_csv_ << frame << ","
-                  << std::fixed << std::setprecision(6)
-                  << gap_ms << ","
-                  << wall_elapsed_ms << ","
-                  << ideal_elapsed_ms << ","
-                  << drift_ms << ","
-                  << ctrl_latency_ms << "\n";
-    }
-
-    // 7) 통계 집계도 여기서 같이
-    if (frame > warmup_frames_) {
-        gaps_ms_.push_back(gap_ms);
-        drift_ms_.push_back(drift_ms);
-        analyzed_frames_++;
-        if (gap_to_deadline.count() > 0) {
-            over_cnt_++;
+    // sync_steer 배열의 모든 원소가 true인지 확인
+    for (int i = 0; i < size; i++) {
+        if (sync_steer[i] == false) {
+            return false; // 하나라도 false면 false 반환
         }
     }
+
+    //all received
+    for(int i = 0; i<size; i++) {
+        sync_throttle[i] = false;
+    }
+    for(int i = 0; i<size; i++) {
+        sync_steer[i] = false;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    return true;
+
 }
-
 
 
 void SyncManager::recordData() {

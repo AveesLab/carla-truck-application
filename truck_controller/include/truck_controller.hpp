@@ -52,9 +52,7 @@ public:
 
 private:
     // 상수 정의
-    double MIN_GAP_;
-    double DESIRED_GAP_;
-    double EMERGENCY_GAP_ ;
+
     const double max_steer_angle_rad = 0.7;
     const double min_dist_threshold_sq = 0.01 * 0.01;
     const double TRUCK_LENGTH = 16.8;
@@ -62,7 +60,6 @@ private:
     const double SENSOR_TO_FRONT = 4.0;
     const double SENSOR_TO_REAR = 12.0;
     const double STEERING_THRESHOLD = 0.04;                  // 조향각 임계값
-
 
     const Missionidx Curve_idx_1 ={300-300,1800+300};
     const Missionidx Curve_idx_2 ={78100-300,79600+300};
@@ -145,16 +142,8 @@ private:
     // *changed
     bool truck0_overspeed_flag_;
     bool truck1_overspeed_flag_;
-    bool truck2_overspeed_flag_;    
+    bool truck2_overspeed_flag_;
 
-    // *changed
-    int LV_aid = 0;
-    int FV1_aid = 1;
-    int FV2_aid = 2;
-
-    double acc_speed_;
-    double slow_speed_;
-    double stable_speed_;
 
     
 
@@ -243,7 +232,6 @@ private:
     void check_overrun();
     void check_lane_change_end();
     void update_formation_id();
-
-    bool check_stable_gaps();
+    
 
 };

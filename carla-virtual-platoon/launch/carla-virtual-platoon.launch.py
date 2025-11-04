@@ -24,7 +24,7 @@ def generate_nodes(context, *, num_trucks, map_name):
         node = Node(
             package='carla-virtual-platoon',
             executable='main',
-            #name=f'bridge{i-1}',
+            name=f'bridge{i-1}',
             namespace=f'truck{i-1}',
             output='screen',
             parameters=[
@@ -33,8 +33,6 @@ def generate_nodes(context, *, num_trucks, map_name):
                             {            
                                 'use_sim_time': True ,          
                                 #'fixed_delta_seconds': 0.005,
-                                'max_substep_delta_time': 0.005,
-                                'max_substeps': 2,
                                 'synchronous_mode_wait_for_vehicle_control_command': False
                                 
                             },

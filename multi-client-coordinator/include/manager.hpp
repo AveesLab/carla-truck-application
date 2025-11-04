@@ -13,6 +13,7 @@
 #include "std_msgs/msg/u_int32.hpp"
 #include "std_msgs/msg/float32.hpp"
 #include "std_msgs/msg/string.hpp"
+#include "geometry_msgs/msg/point.hpp"
 #include <sys/mman.h>
 #include <sys/stat.h>  /* For mode constants */
 #include <fcntl.h>     /* For O_* constants */
@@ -24,6 +25,7 @@
 using namespace carla::traffic_manager;
 #define SHARED_MEMORY_NAME "/sync_memory"
 using namespace std;
+
 class SyncManager : public rclcpp::Node {
 
 public:
@@ -41,21 +43,29 @@ private:
     mutex mutex_;
     bool isNodeRunning_ = false;
     bool registered = false;
+    bool go_time = false;
     int size = 0;
     int cnt = 0;
     float sim_time = 0.0f;
+    bool enu = false;
     std::vector<bool> registration_;
     std::vector<bool> sync_throttle;
     std::vector<bool> sync_steer;
-    std::thread manager_Thread;
+    std::thread manager_thread_;
+    std::thread tick_thread_;
+    std::atomic<bool> tick_request_ = false;
+    
     vector<unsigned int> truck_ids;
     vector<unsigned int> trailer_ids;
     void managerInThread();
-    void recordData();
+    void tickSchedulerThread();
     void FindAllTruck();
-    void timerCallback();
+    void recordData();
+    void recordTiming(uint32_t frame, const std::chrono::steady_clock::time_point& t_start, const std::chrono::steady_clock::time_point& prev_deadline,
+    const std::chrono::nanoseconds& period_ns, const std::chrono::steady_clock::time_point& t0, const std::chrono::steady_clock::time_point& first_deadline);
+    
+    size_t callback_id;
     rclcpp::TimerBase::SharedPtr timer_;
-    double GetDistanceBetweenActors(ActorPtr current, ActorPtr target);
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr ShutdownPublisher_;
     rclcpp::Publisher<ros2_msg::msg::Target>::SharedPtr TarPub_;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr GapPub_;
@@ -63,13 +73,13 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr LC1Pub_;
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr LC2Pub_;
     rclcpp::Publisher<std_msgs::msg::UInt32>::SharedPtr FramePub_;
-    size_t callback_id;
+    
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr TruckSizeSubscriber_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr RegistrationSubscriber_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr SyncSubscriber_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr SyncThrottleSubscriber_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr SyncSteerSubscriber_;
-
+    rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr SyncEnuSubscriber_;
 
     //callback
     void TruckSizeSubCallback(const std_msgs::msg::Int32::SharedPtr msg);
@@ -112,7 +122,31 @@ private:
     void FV1DistSubCallback(const std_msgs::msg::Float32::SharedPtr msg);
     void FV2DistSubCallback(const std_msgs::msg::Float32::SharedPtr msg);
 
-
     int fd;
     int* shared_mem_ptr;
+
+    std::vector<boost::shared_ptr<cc::Vehicle>> vehicles_;
+
+    // ★ 추가: 프레임 카운터 & 갭 계측용
+    std::atomic<uint32_t> frame_k{0};
+
+    // --- E1 profiler additions ---
+    std::ofstream prof_csv_;
+    std::string prof_path_ = "/home/avees/ros2_ws/src/test_truck/e1_profiler.csv";
+    uint64_t warmup_frames_ = 1000;
+
+    std::chrono::steady_clock::time_point t0_{};
+    bool t0_init_ = false;
+
+    double period_ms_ = 0.0;
+    std::chrono::nanoseconds period_ns_{0};
+    std::atomic<int64_t> last_tick_start_ns_{0};   // tick 시작 시각
+    std::atomic<int64_t> last_sync_finish_ns_{0};  // sync 완료 시각
+
+    uint64_t analyzed_frames_ = 0;
+    uint64_t over_cnt_ = 0;
+
+    std::vector<double> gaps_ms_;   // GapStartMs (warmup 제외)
+    std::vector<double> drift_ms_;  // Drift trajectory (warmup 제외)
+
 };

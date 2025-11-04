@@ -64,13 +64,10 @@ TruckController::TruckController(int argu_id)
   this->get_parameter("STABLE_SPEED", STABLE_SPEED_);
 
   this->get_parameter("WHEEL_BASE", WHEEL_BASE_);
-  this->get_parameter("MIN_GAP", MIN_GAP_);
-  this->get_parameter("DESIRED_GAP", DESIRED_GAP_);
-  this->get_parameter("EMERGENCY_GAP", EMERGENCY_GAP_);
+  this->get_parameter("MIN_GAP", min_gap_);
+  this->get_parameter("DESIRED_GAP", desired_gap_);
+  this->get_parameter("EMERGENCY_GAP", emergency_gap_);
 
-  min_gap_ = MIN_GAP_;
-  desired_gap_ = DESIRED_GAP_;
-  emergency_gap_ = EMERGENCY_GAP_;
 
   // --- 상태 변수 초기화 ---
   prev_x_ = std::numeric_limits<double>::quiet_NaN(); // 이전 위치 없음 표시
@@ -163,14 +160,14 @@ TruckController::TruckController(int argu_id)
       "/lane_change_end_flag", 10,
       std::bind(&TruckController::formation_change_end_callback, this, std::placeholders::_1));
   sub_formation_command_ = this->create_subscription<ros2_msg::msg::TruckCommand>(
-        "/command", 10,
+      ns + "/command", 10,
       std::bind(&TruckController::formation_command_callback, this, std::placeholders::_1));
-  sub_frame_ = this->create_subscription<std_msgs::msg::UInt32>("/sim/frame_id", 10, std::bind(&TruckController::on_frame_tick, this, std::placeholders::_1));
+  //sub_frame_ = this->create_subscription<std_msgs::msg::UInt32>("/sim/frame_id", 10, std::bind(&TruckController::on_frame_tick, this, std::placeholders::_1));
 
-//   // 200Hz 제어 타이머 추가
-//   timer_ = this->create_wall_timer(
-//       std::chrono::milliseconds(10),  // 200Hz = 5ms // 100Hz = 10ms
-//       std::bind(&TruckController::compute_control, this));
+  // 200Hz 제어 타이머 추가
+  timer_ = this->create_wall_timer(
+      std::chrono::milliseconds(10),  // 200Hz = 5ms // 100Hz = 10ms
+      std::bind(&TruckController::compute_control, this));
       
   //RCLCPP_INFO(this->get_logger(), "TruckController node initialized (IMU-less GPS Steer Mode). Yaw will be initialized on first control cycle.");
 
@@ -178,16 +175,16 @@ TruckController::TruckController(int argu_id)
 
 } // 생성자 끝
 
-void TruckController::on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg)
-{
-    uint32_t frame_id = msg->data;
+// void TruckController::on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg)
+// {
+//     uint32_t frame_id = msg->data;
 
-    //로그로 프레임 확인
-    RCLCPP_DEBUG(this->get_logger(), "Frame %u tick received", frame_id);
+//     //로그로 프레임 확인
+//     RCLCPP_DEBUG(this->get_logger(), "Frame %u tick received", frame_id);
 
-    // tick마다 제어 함수 1회 실행
-    this->compute_control();
-}
+//     // tick마다 제어 함수 1회 실행
+//     this->compute_control();
+// }
 
 // ENU 위치 수신 콜백: 위치 업데이트 후 제어 함수 호출
 void TruckController::server_enu_callback(const geometry_msgs::msg::Point::SharedPtr msg)
@@ -224,6 +221,7 @@ void TruckController::server_enu_callback(const geometry_msgs::msg::Point::Share
 
 
 
+// Formation 변경 시 새로운 FID 계산
 void TruckController::update_formation_id() {
     if(actor_id_ == 0){
         std::cout<<"update_formation_id 호출"<<std::endl;
@@ -231,19 +229,6 @@ void TruckController::update_formation_id() {
     formation_change_count_++;
     // Formation 변경 시 FID 순환: 0->2, 1->0, 2->1
     formation_id_ = (formation_id_ + 2) % 3;
-
-    LV_aid = (LV_aid + 1) % 3;
-    FV1_aid = (FV1_aid + 1) % 3;
-    FV2_aid = (FV2_aid + 1) % 3;
-    if(formation_id_ == 0)
-    {
-
-        //herecout
-        std::cout<<"LV_aid : "<<LV_aid<<std::endl;
-        std::cout<<"FV1_aid : "<<FV1_aid<<std::endl;
-        std::cout<<"FV2_aid : "<<FV2_aid<<std::endl;
-    }
-    
 
 }
 
@@ -276,25 +261,10 @@ void TruckController::formation_change_end_callback(const std_msgs::msg::Bool::S
 }
 
 void TruckController::formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg) {
-    if(false)  
-    {//prevent lane change
-        lane_change_flag_= false;
-        std::cout<<"blocking lane change callback"<<std::endl;
-    } 
-    else if(msg->lane_change_flag == true)
-    { 
+    if(msg->lane_change_flag == true)
+    {
         // *changed
-        if(check_stable_gaps() == false)//lane changed conditon check
-        {
-            //no meet condition
-            std::cerr<<"No stable gap condition : ignore lane change"<<std::endl;
-            
-        }else{
-            //admit lane change
-            lane_change_flag_ = msg->lane_change_flag;
-            
-            
-        }
+        lane_change_flag_=true;
     }
 }
 
@@ -526,18 +496,19 @@ void TruckController::compute_control()
         if(deadband_flag_ == true)
         {
             // *changed
-            if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
+            //if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
             // if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
-            // if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
-            if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
-            // if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
+            //if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
+            //if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
+             if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
             // if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
-            if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
-            // if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
+            //if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
+            if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
             // if(current_wp_idx_ > 16700 && current_wp_idx_<16800) lane_change_flag_=true;
+            //if(current_wp_idx_ > 17700 && current_wp_idx_<17800) lane_change_flag_=true;
             // if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
-            // if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
-            // if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
+             if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
+            //if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
         }
 
 
@@ -1193,61 +1164,13 @@ bool TruckController::check_stable_speeds()
     }
     else
     {
-        //std::cout<<"unstable speeds"<<std::endl;
-        //std::cout<<"truck0_velocity_ : "<<truck0_velocity_<<std::endl;
-        //std::cout<<"truck1_velocity_ : "<<truck1_velocity_<<std::endl;
-        //std::cout<<"truck2_velocity_ : "<<truck2_velocity_<<std::endl;
+        std::cout<<"unstable speeds"<<std::endl;
+        std::cout<<"truck0_velocity_ : "<<truck0_velocity_<<std::endl;
+        std::cout<<"truck1_velocity_ : "<<truck1_velocity_<<std::endl;
+        std::cout<<"truck2_velocity_ : "<<truck2_velocity_<<std::endl;
 
         return false;
     }
-}
-
-bool TruckController::check_stable_gaps()
-{
-
-
-    if (!std::isnan(truck_positions_[LV_aid].x) && !std::isnan(truck_positions_[LV_aid].y)
-     && !std::isnan(truck_positions_[FV1_aid].x) && !std::isnan(truck_positions_[FV1_aid].y)
-     && !std::isnan(truck_positions_[FV2_aid].x) && !std::isnan(truck_positions_[FV2_aid].y))
-    {
-
-        auto LV_pos = truck_positions_[LV_aid];
-        auto FV1_pos = truck_positions_[FV1_aid];
-        auto FV2_pos = truck_positions_[FV2_aid];
-        
-        double gap_01 = sqrt(distSq({LV_pos.x, LV_pos.y}, {FV1_pos.x, FV1_pos.y}))- TRUCK_LENGTH; //sensor distance - truck length
-        double gap_12 = sqrt(distSq({FV1_pos.x, FV1_pos.y}, {FV2_pos.x, FV2_pos.y}))- TRUCK_LENGTH;
-
-        if(formation_id_== 0)
-        {
-            std::cout<<"gap_01 : "<<gap_01<<std::endl;
-            std::cout<<"gap_12 : "<<gap_12<<std::endl;
-            
-        } 
-
-
-
-
-        if (gap_01 < DESIRED_GAP_ && gap_01 > MIN_GAP_)
-        {
-            if(gap_12 < DESIRED_GAP_ && gap_12 > MIN_GAP_)
-            {
-                return true;
-            }
-
-        }
-        
-
-
-
-
-
-    }
-
-
-
-    return false;
-
 }
 
 bool TruckController::check_overspeed()
