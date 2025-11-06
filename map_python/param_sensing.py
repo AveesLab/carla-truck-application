@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from imp import is_frozen_package
 import sys
 import time
 
@@ -8,7 +9,7 @@ from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor  # 또는 SingleThreadedExecutor
 
 from geometry_msgs.msg import Point
-from std_msgs.msg import Float32
+from std_msgs.msg import Float32, Empty, Bool, Int32, UInt32
 
 DEFAULT_DRAG = 0.6
 
@@ -18,9 +19,13 @@ class TruckPointPublisher(Node):
         # ROS2 네이밍 컨벤션에 따라 노드 이름은 소문자 스네이크 케이스 권장
         super().__init__('truck_param_publisher', namespace=namespace) #changed
         self.publisher_ = self.create_publisher(Point, 'server/enu', 10)
+        self.pub_sync_drag = self.create_publisher(Int32, 'sync_drag', 10)       # 절대 토픽
+       
+
+
         self.vehicle = vehicle_actor
         self.timer_period = 0.01  # seconds
-        self.timer = self.create_timer(self.timer_period, self.publish_point_callback)
+        self.timer = self.create_timer(self.timer_period, self.publish_point_callback) 
 
         # drag 토픽 수신 전 기본값 0.6을 보유. 수신 시 덮어씀.
         self.target_drag = float(DEFAULT_DRAG)
@@ -28,15 +33,47 @@ class TruckPointPublisher(Node):
         self.sub_drag = self.create_subscription(
             Float32, 'drag', self.on_drag, 10  # 네임스페이스 적용 → /truckX/drag
         )
+        self.sub_frame_id = self.create_subscription(UInt32, '/sim/frame_id', self.on_frame_id, 10)    # 절대 토픽
 
         self.get_logger().info(
             f"Publisher for namespace '{self.get_namespace()}' initialized for CARLA vehicle ID {self.vehicle.id}."
         )
 
+        self.is_get_drag = False
+        self.is_get_frame_id = False
+        
+        self.drag_change_threshold = 1e-4  # drag 값 변화 임계값
+
+    def on_frame_id(self, msg: UInt32):
+        self.is_get_frame_id = True
+        self.frame_id = msg.data
+        
     def on_drag(self, msg: Float32):
         self.target_drag = float(msg.data)
+        self.is_get_drag = True
+        
+    def _apply_drag_with_velocity_preservation(self, target_drag: float, pc: carla.VehiclePhysicsControl):
+
+        # [속도 백업] apply_physics_control 전에 현재 속도와 각속도 백업
+        #v = self.vehicle.get_velocity()
+        #w = self.vehicle.get_angular_velocity()
+        
+        # drag_coefficient 변경 및 적용
+        pc.drag_coefficient = target_drag
+        self.vehicle.apply_physics_control(pc)
+        self.last_applied_drag = target_drag
+        
+        # [속도 복원] C++ 레벨에서 이미 복원되지만, Python에서도 시도
+
+        #self.vehicle.set_target_velocity(v)
+        #self.vehicle.set_target_angular_velocity(w)
+
+
 
     def publish_point_callback(self):
+        if not self.is_get_drag or not self.is_get_frame_id:
+            return
+        
         # 차량 액터가 유효하고 살아있는지 확인
         if not self.vehicle or not self.vehicle.is_alive:
             self.get_logger().warn(
@@ -44,27 +81,34 @@ class TruckPointPublisher(Node):
             )
             return
 
-        try:
-            # 위치 퍼블리시
-            transform = self.vehicle.get_transform()
-            loc = transform.location
-            msg = Point()
-            msg.x = loc.x
-            msg.y = loc.y
-            msg.z = loc.z
-            self.publisher_.publish(msg)
 
-            # drag 적용: 변경 시에만 ApplyPhysicsControl 수행
-            want = float(self.target_drag)
-            pc = self.vehicle.get_physics_control()
-            cur = getattr(pc, 'drag_coefficient', None)
-            if (cur is None) or (abs(cur - want) > 1e-4):
-                pc.drag_coefficient = want
-                self.vehicle.apply_physics_control(pc)
-                self.last_applied_drag = want
+        # 위치 퍼블리시
+        transform = self.vehicle.get_transform()
+        loc = transform.location
+        msg = Point()
+        msg.x = loc.x
+        msg.y = loc.y
+        msg.z = loc.z
+        self.publisher_.publish(msg)
 
-        except Exception as e:
-            self.get_logger().error(f"[{self.get_namespace()}] Error in publish_point_callback: {e}")
+        # drag 적용: 변경 시에만 ApplyPhysicsControl 수행
+        want = float(self.target_drag)
+        pc = self.vehicle.get_physics_control()     
+        cur = getattr(pc, 'drag_coefficient', None)
+        
+        # drag 값이 변경되었는지 확인
+        if (cur is None) or (abs(cur - want) > self.drag_change_threshold):
+            self._apply_drag_with_velocity_preservation(want, pc)
+
+
+
+        self.is_get_drag = False
+        self.is_get_frame_id = False
+        self.pub_sync_drag.publish(Int32(data=1))
+        self.get_logger().info(f"[{self.get_namespace()}] Sync drag published")
+
+
+
 
 
 def main():

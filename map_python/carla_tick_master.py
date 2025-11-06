@@ -45,8 +45,12 @@ class CarlaTickMaster(Node):
         self.num_trucks = 3
         self.sync_throttle_flags = {i: False for i in range(self.num_trucks)}
         self.sync_steer_flags = {i: False for i in range(self.num_trucks)}
+        self.sync_drag_flags = {i: False for i in range(self.num_trucks)}
         self.sync_throttle_sub = self.create_subscription(Int32, '/sync_throttle', self.sync_throttle_callback, 10)
         self.sync_steer_sub = self.create_subscription(Int32, '/sync_steer', self.sync_steer_callback, 10)
+        self.sync_drag_sub0 = self.create_subscription(Int32, '/truck0/sync_drag', self.sync_drag_callback0, 10)
+        self.sync_drag_sub1 = self.create_subscription(Int32, '/truck1/sync_drag', self.sync_drag_callback1, 10)
+        self.sync_drag_sub2 = self.create_subscription(Int32, '/truck2/sync_drag', self.sync_drag_callback2, 10)
 
         # --- CSV 로깅 설정 ---
         self.save_dir = os.path.expanduser('~/ros2_ws/src/test_truck')
@@ -103,10 +107,25 @@ class CarlaTickMaster(Node):
         self.check_and_tick()
 
 
+    def sync_drag_callback0(self, msg):
+        self.sync_drag_flags[0] = True
+        self.check_and_tick()
+
+    def sync_drag_callback1(self, msg):
+        self.sync_drag_flags[1] = True
+        self.check_and_tick()
+
+    def sync_drag_callback2(self, msg):
+        self.sync_drag_flags[2] = True
+        self.check_and_tick()
+
+
     def check_and_tick(self):
-        if all(self.sync_steer_flags.values()) and all(self.sync_throttle_flags.values()):
+        if all(self.sync_steer_flags.values()) and all(self.sync_throttle_flags.values()) and all(self.sync_drag_flags.values()):
             self.sync_steer_flags = {i: False for i in range(self.num_trucks)}
             self.sync_throttle_flags = {i: False for i in range(self.num_trucks)}
+            self.sync_drag_flags = {i: False for i in range(self.num_trucks)}
+
             self.get_logger().info(f"[READY] All of trucks contol ready at frame {self.current_frame}")
             self.publish_frame_and_tick()
 
