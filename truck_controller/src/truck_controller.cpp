@@ -508,17 +508,17 @@ void TruckController::compute_control()
         {
             // *changed
             //if(current_wp_idx_ > 3700 && current_wp_idx_<3800) lane_change_flag_=true;
-             if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
+            //if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
             //if(current_wp_idx_ > 7700 && current_wp_idx_<7800) lane_change_flag_=true;
             //if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
-             if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
+            //if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
             // if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
             //if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
-            if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
+            //if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
             // if(current_wp_idx_ > 16700 && current_wp_idx_<16800) lane_change_flag_=true;
             //if(current_wp_idx_ > 17700 && current_wp_idx_<17800) lane_change_flag_=true;
             // if(current_wp_idx_ > 18200 && current_wp_idx_<18300) lane_change_flag_=true;
-             if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
+            //if(current_wp_idx_ > 19700 && current_wp_idx_<19800) lane_change_flag_=true;
             //if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
         }
 

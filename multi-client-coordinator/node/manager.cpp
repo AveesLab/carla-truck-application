@@ -191,11 +191,12 @@ bool SyncManager::check_register()
     std::cerr << "tick for register " << std::endl;
     if(cnt == 0) 
     {
-        //world->Tick(time_);
         
         std_msgs::msg::UInt32 frame_msg;
         frame_msg.data = frame_k.load();
         FramePub_->publish(frame_msg);
+     
+        world->Tick(time_);
         
         //FindAllTruck();
         cnt = 1;
@@ -209,12 +210,13 @@ bool SyncManager::check_register()
         registered = true;
         std::cerr << "All registered" << std::endl;
         FindAllTruck();
-        //world->Tick(time_);
 
         std_msgs::msg::UInt32 frame_msg;
         //frame_msg.data = static_cast<uint32_t>(sim_time / 40.0f); // 또는 frame counter
         frame_msg.data = frame_k.load();
         FramePub_->publish(frame_msg);
+
+        world->Tick(time_);
 
         return true;
     }
@@ -332,65 +334,61 @@ void SyncManager::managerInThread()
 
 void SyncManager::tickSchedulerThread()
 {
-    try 
-    {
-        using clock = std::chrono::steady_clock;
-        using ns    = std::chrono::nanoseconds;
-        using TP    = std::chrono::time_point<clock, ns>;
+    using clock = std::chrono::steady_clock;
+    using ns    = std::chrono::nanoseconds;
+    using TP    = std::chrono::time_point<clock, ns>;
 
-        TP next_deadline = std::chrono::time_point_cast<ns>(clock::now()) + period_ns_;
+    bool   t0_init = false;
+    TP     t0;
+    TP     first_deadline;               // 이벤트 모드에선 안 써도 됨
+    uint32_t prev_frame = 0;
+    TP     prev_t_start;
+    TP     prev_deadline_tp;             // 이벤트 모드에선 "이전 tick 시각" 정도로 쓰면 됨
 
-        bool t0_init = false;
-        bool first_deadline_init = false;
-        TP t0, first_deadline;
+    if(!t0_init) {
+        const uint32_t k = frame_k.fetch_add(1) + 1;
+        std_msgs::msg::UInt32 msg;
+        msg.data = k;
+        FramePub_->publish(msg);
+    }
 
-        static uint32_t prev_frame = 0;
-        static TP       prev_t_start;
-        static TP       prev_deadline_tp;
-
-        while (isNodeRunning_) 
-        {
-            std::this_thread::sleep_until(next_deadline);
-            const TP t_start = std::chrono::time_point_cast<ns>(clock::now());
-            last_tick_start_ns_.store(t_start.time_since_epoch().count(), std::memory_order_release);
-
-            if (prev_frame != 0) {
-                recordTiming(prev_frame, prev_t_start, prev_deadline_tp, period_ns_, t0, first_deadline);
-            }
-
-            if (!t0_init) {
-                t0 = t_start;
-                t0_init = true;
-            }
-            if (!first_deadline_init) {
-                first_deadline = next_deadline - period_ns_;
-                first_deadline_init = true;
-            }
-
-        
-            auto t_before = std::chrono::time_point_cast<ns>(clock::now());
-            RCLCPP_INFO(this->get_logger(), "[Tick %u] before Tick(): %.6f s", frame_k.load(), double(t_before.time_since_epoch().count()) / 1e9);
-            // 실제 step
-            world->Tick(time_);
-
-            auto t_after = std::chrono::time_point_cast<ns>(clock::now());
-            RCLCPP_INFO(this->get_logger(), "[Tick %u] after Tick(): %.6f s  (Δ=%.3f ms)",frame_k.load(),double(t_after.time_since_epoch().count()) / 1e9,double((t_after - t_before).count()) / 1e6);
-
-            // frame publish
-            const uint32_t k = frame_k.fetch_add(1) + 1;
-            std_msgs::msg::UInt32 frame_msg;
-            frame_msg.data = k;
-            FramePub_->publish(frame_msg);
-
-            prev_frame       = k;
-            prev_t_start     = t_start;
-            prev_deadline_tp = next_deadline;
-
-            next_deadline += period_ns_;
+    while (isNodeRunning_) {
+        // manager 스레드가 tick_request_ 세워줄 때까지 잠깐 쉼
+        if (!tick_request_.exchange(false, std::memory_order_acq_rel)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
         }
-    } catch (const std::exception &e) {
-        RCLCPP_ERROR(get_logger(), "[TickThread] Exception: %s", e.what());
-        isNodeRunning_ = false; 
+
+        // 여기 오면 "컨트롤 다 왔음, 이제 tick 하자" 상태
+        TP t_start = std::chrono::time_point_cast<ns>(clock::now());
+        last_tick_start_ns_.store(t_start.time_since_epoch().count(), std::memory_order_release);
+
+        // 직전 프레임에 대한 timing 기록
+        if (prev_frame != 0) {
+            // 이벤트 모드니까 deadline 대신 "직전 tick 시각 + period"를 가짜 deadline 으로 넣어줄 수 있음
+            TP fake_deadline = prev_t_start + period_ns_;
+            recordTiming(prev_frame, prev_t_start, fake_deadline, period_ns_, t0_init ? t0 : t_start, t0_init ? first_deadline : t_start);
+        }
+
+        if (!t0_init) {
+            t0 = t_start;
+            first_deadline = t_start;  // 이벤트 모드라 그냥 시작시각 넣어둠
+            t0_init = true;
+        }
+
+        // frame publish
+        const uint32_t k = frame_k.fetch_add(1) + 1;
+        std_msgs::msg::UInt32 msg;
+        msg.data = k;
+        FramePub_->publish(msg);
+
+        // 실제 CARLA step
+        world->Tick(time_);
+
+        // 다음 recordTiming을 위해 저장
+        prev_frame       = k;
+        prev_t_start     = t_start;
+        prev_deadline_tp = t_start + period_ns_;
     }
 }
 

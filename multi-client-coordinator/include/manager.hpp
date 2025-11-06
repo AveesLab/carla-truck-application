@@ -51,6 +51,8 @@ private:
     std::vector<bool> registration_;
     std::vector<bool> sync_throttle;
     std::vector<bool> sync_steer;
+    std::vector<bool> sync_drag;
+    std::vector<bool> sync_soc;
     std::thread manager_thread_;
     std::thread tick_thread_;
     std::atomic<bool> tick_request_ = false;
@@ -79,6 +81,8 @@ private:
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr SyncSubscriber_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr SyncThrottleSubscriber_;
     rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr SyncSteerSubscriber_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr SyncDragSubscriber_;
+    rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr SyncSOCSubscriber_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr SyncEnuSubscriber_;
 
     //callback
@@ -86,6 +90,8 @@ private:
     void RegistrationSubCallback(const std_msgs::msg::Int32::SharedPtr msg);
     void SyncThrottleSubCallback(const std_msgs::msg::Int32::SharedPtr msg);
     void SyncSteerSubCallback(const std_msgs::msg::Int32::SharedPtr msg);
+    void SyncDragSubCallback(const std_msgs::msg::Int32::SharedPtr msg);
+    void SyncSOCSubCallback(const std_msgs::msg::Int32::SharedPtr msg);
     bool check_register();
     bool sync_received();
 
@@ -148,5 +154,8 @@ private:
 
     std::vector<double> gaps_ms_;   // GapStartMs (warmup 제외)
     std::vector<double> drift_ms_;  // Drift trajectory (warmup 제외)
+    // manager.hpp 안에
+    std::condition_variable tick_cv_;
+    std::mutex tick_mtx_;
 
 };

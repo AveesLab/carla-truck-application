@@ -7,9 +7,9 @@
 //
 // Code generated for Simulink model 'BMS'.
 //
-// Model version                  : 10.114
+// Model version                  : 10.118
 // Simulink Coder version         : 24.2 (R2024b) 21-Jun-2024
-// C/C++ source code generated on : Sat Oct 11 21:04:02 2025
+// C/C++ source code generated on : Thu Nov  6 15:11:50 2025
 //
 // Target selection: ert.tlc
 // Embedded hardware selection: Intel->x86-64 (Linux 64)
@@ -514,7 +514,7 @@ double BMS::qrFactor(double A, double S, double Ns)
   rtDW.M_c[1] = Ns;
 
   // Start for MATLABSystem: '<S11>/MATLAB System'
-  for (rtDW.b_i_c = 0; rtDW.b_i_c < 1; rtDW.b_i_c++) {
+  for (rtDW.b_i_p = 0; rtDW.b_i_p < 1; rtDW.b_i_p++) {
     rtDW.b_atmp = rtDW.M_c[0];
     rtDW.beta1 = xnrm2(1, rtDW.M_c, 2);
     if (rtDW.beta1 != 0.0) {
@@ -524,19 +524,19 @@ double BMS::qrFactor(double A, double S, double Ns)
       }
 
       if (std::abs(rtDW.beta1) < 1.0020841800044864E-292) {
-        rtDW.knt_f = -1;
+        rtDW.knt_c = -1;
         do {
-          rtDW.knt_f++;
-          rtDW.M_p = rtDW.M_c[1];
+          rtDW.knt_c++;
+          rtDW.M_b = rtDW.M_c[1];
           for (rtDW.jA = 2; rtDW.jA < 3; rtDW.jA++) {
-            rtDW.M_p *= 9.9792015476736E+291;
+            rtDW.M_b *= 9.9792015476736E+291;
           }
 
-          rtDW.M_c[1] = rtDW.M_p;
+          rtDW.M_c[1] = rtDW.M_b;
           rtDW.beta1 *= 9.9792015476736E+291;
           rtDW.b_atmp *= 9.9792015476736E+291;
         } while ((std::abs(rtDW.beta1) < 1.0020841800044864E-292) &&
-                 ((rtDW.knt_f + 1) < 20));
+                 ((rtDW.knt_c + 1) < 20));
 
         rtDW.beta1 = rt_hypotd_snf_e(rtDW.b_atmp, xnrm2(1, rtDW.M_c, 2));
         if (rtDW.b_atmp >= 0.0) {
@@ -545,23 +545,23 @@ double BMS::qrFactor(double A, double S, double Ns)
 
         rtDW.b_atmp = 1.0 / (rtDW.b_atmp - rtDW.beta1);
         for (rtDW.jA = 2; rtDW.jA < 3; rtDW.jA++) {
-          rtDW.M_p *= rtDW.b_atmp;
+          rtDW.M_b *= rtDW.b_atmp;
         }
 
-        rtDW.M_c[1] = rtDW.M_p;
-        for (rtDW.jA = 0; rtDW.jA <= rtDW.knt_f; rtDW.jA++) {
+        rtDW.M_c[1] = rtDW.M_b;
+        for (rtDW.jA = 0; rtDW.jA <= rtDW.knt_c; rtDW.jA++) {
           rtDW.beta1 *= 1.0020841800044864E-292;
         }
 
         rtDW.b_atmp = rtDW.beta1;
       } else {
         rtDW.b_atmp = 1.0 / (rtDW.M_c[0] - rtDW.beta1);
-        rtDW.M_p = rtDW.M_c[1];
+        rtDW.M_b = rtDW.M_c[1];
         for (rtDW.jA = 2; rtDW.jA < 3; rtDW.jA++) {
-          rtDW.M_p *= rtDW.b_atmp;
+          rtDW.M_b *= rtDW.b_atmp;
         }
 
-        rtDW.M_c[1] = rtDW.M_p;
+        rtDW.M_c[1] = rtDW.M_b;
         rtDW.b_atmp = rtDW.beta1;
       }
     }
@@ -604,79 +604,68 @@ void BMS::step()
     (&rtM)->Timing.t[0] = rtsiGetT(&(&rtM)->solverInfo);
   }
 
-  // Outputs for Atomic SubSystem: '<Root>/BMS'
+  // Outputs for Atomic SubSystem: '<Root>/BMS with LSTM'
   b = ((&rtM)->isMajorTimeStep());
   if (b) {
     // UnitDelay: '<S1>/SOC_t-2'
-    rtDW.SpeedDifferent = rtDW.SOC_t2_DSTATE;
+    rtDW.DiscreteTimeIntegrator_d = rtDW.SOC_t2_DSTATE;
 
     // Lookup_n-D: '<S1>/SOC-Temp' incorporates:
-    //   Sum: '<S1>/Speed Different'
+    //   DiscreteIntegrator: '<S5>/Discrete-Time Integrator'
 
-    rtDW.SOCTemp = look1_binlg(rtDW.SpeedDifferent, rtConstP.SOCTemp_bp01Data,
-      rtConstP.SOCTemp_tableData, 3987U);
+    rtDW.SOCTemp = look1_binlg(rtDW.DiscreteTimeIntegrator_d,
+      rtConstP.SOCTemp_bp01Data, rtConstP.SOCTemp_tableData, 3987U);
 
     // Lookup_n-D: '<S1>/SOC-Vol1' incorporates:
-    //   Sum: '<S1>/Speed Different'
+    //   DiscreteIntegrator: '<S5>/Discrete-Time Integrator'
 
-    rtDW.Vsoc = look1_binlag(rtDW.SpeedDifferent, rtConstP.SOCVol1_bp01Data,
-      rtConstP.SOCVol1_tableData, 100U);
+    rtDW.Vsoc = look1_binlag(rtDW.DiscreteTimeIntegrator_d,
+      rtConstP.SOCVol1_bp01Data, rtConstP.SOCVol1_tableData, 100U);
   }
 
   // FromWorkspace: '<S1>/From Workspace19'
   {
     double *pDataValues{ (double *) rtDW.FromWorkspace19_PWORK.DataPtr };
 
-    rtDW.F_rolling = pDataValues[0];
+    rtDW.SpeedDifferent = pDataValues[0];
   }
 
   // Sum: '<S1>/Add13' incorporates:
   //   Constant: '<S1>/Constant8'
 
-  rtDW.Add13 = 1.0 - rtDW.F_rolling;
-  if (b) {
-    // Sum: '<S1>/Speed Different' incorporates:
-    //   Gain: '<S1>/Gain1'
-    //   Inport: '<Root>/ego_velocity'
-    //   Inport: '<Root>/target_velocity'
+  rtDW.Add13 = 1.0 - rtDW.SpeedDifferent;
 
-    rtDW.SpeedDifferent = rtU.target_velocity - (3.6 * rtU.ego_velocity);
+  // Sum: '<S1>/Speed Different' incorporates:
+  //   Gain: '<S1>/Gain1'
+  //   Inport: '<Root>/ego_velocity'
+  //   Inport: '<Root>/target_velocity'
 
-    // Gain: '<S135>/Proportional Gain'
-    rtDW.ProportionalGain = 100.0 * rtDW.SpeedDifferent;
-
-    // Gain: '<S123>/Derivative Gain'
-    rtDW.DerivativeGain = 0.0001 * rtDW.SpeedDifferent;
-  }
-
-  // Switch: '<S1>/Switch1' incorporates:
-  //   Integrator: '<S130>/Integrator'
-
-  rtDW.F_rolling = rtX.Integrator_CSTATE;
+  rtDW.SpeedDifferent = rtU.target_velocity - (3.6 * rtU.ego_velocity);
 
   // Gain: '<S133>/Filter Coefficient' incorporates:
+  //   Gain: '<S123>/Derivative Gain'
   //   Integrator: '<S125>/Filter'
   //   Sum: '<S125>/SumD'
 
-  rtDW.FilterCoefficient = (rtDW.DerivativeGain - rtX.Filter_CSTATE) * 10.0;
+  rtDW.FilterCoefficient = ((0.0001 * rtDW.SpeedDifferent) - rtX.Filter_CSTATE) *
+    10.0;
 
   // Sum: '<S1>/Add14' incorporates:
+  //   Gain: '<S135>/Proportional Gain'
   //   Gain: '<S1>/Accel2'
+  //   Integrator: '<S130>/Integrator'
   //   Sum: '<S139>/Sum'
 
-  rtDW.rtb_Add14_b = (rtDW.ProportionalGain + rtDW.F_rolling +
-                      rtDW.FilterCoefficient) * 100.0;
+  rtDW.DiscreteTimeIntegrator_d = ((100.0 * rtDW.SpeedDifferent) +
+    rtX.Integrator_CSTATE + rtDW.FilterCoefficient) * 100.0;
 
   // Saturate: '<S1>/Brake[%]1'
-  if (rtDW.rtb_Add14_b > 0.0) {
-    // Switch: '<S1>/Switch1'
+  if (rtDW.DiscreteTimeIntegrator_d > 0.0) {
     rtDW.F_rolling = 0.0;
-  } else if (rtDW.rtb_Add14_b < -100.0) {
-    // Switch: '<S1>/Switch1'
+  } else if (rtDW.DiscreteTimeIntegrator_d < -100.0) {
     rtDW.F_rolling = -100.0;
   } else {
-    // Switch: '<S1>/Switch1'
-    rtDW.F_rolling = rtDW.rtb_Add14_b;
+    rtDW.F_rolling = rtDW.DiscreteTimeIntegrator_d;
   }
 
   // End of Saturate: '<S1>/Brake[%]1'
@@ -707,7 +696,7 @@ void BMS::step()
   //   Inport: '<Root>/ego_velocity'
   //   Product: '<S1>/Divide35'
 
-  rtDW.Divide36 = rtU.ego_velocity / (6.2831853071795862 * rtDW.uDLookupTable1);
+  rtDW.F_rolling = rtU.ego_velocity / (6.2831853071795862 * rtDW.uDLookupTable1);
 
   // FromWorkspace: '<S1>/From Workspace22'
   {
@@ -720,22 +709,21 @@ void BMS::step()
   //   Gain: '<S1>/Gain20'
   //   Product: '<S1>/Divide37'
 
-  rtDW.uDLookupTable1 = (rtDW.Divide36 * rtDW.uDLookupTable1) * 60.0;
+  rtDW.uDLookupTable1 = (rtDW.F_rolling * rtDW.uDLookupTable1) * 60.0;
 
-  // Switch: '<S1>/Switch1' incorporates:
+  // Lookup_n-D: '<S1>/MAX Torque1' incorporates:
   //   Lookup_n-D: '<S1>/2-D Lookup Table1'
-  //   Lookup_n-D: '<S1>/MAX Torque1'
 
   rtDW.F_rolling = look1_binlg(rtDW.uDLookupTable1, rtConstP.MAXTorque1_bp01Data,
     rtConstP.MAXTorque1_tableData, 5U);
 
   // Saturate: '<S1>/Accel[%]1'
-  if (rtDW.rtb_Add14_b > 100.0) {
+  if (rtDW.DiscreteTimeIntegrator_d > 100.0) {
     // Sum: '<S1>/Add14'
-    rtDW.rtb_Add14_b = 100.0;
-  } else if (rtDW.rtb_Add14_b < 0.0) {
+    rtDW.DiscreteTimeIntegrator_d = 100.0;
+  } else if (rtDW.DiscreteTimeIntegrator_d < 0.0) {
     // Sum: '<S1>/Add14'
-    rtDW.rtb_Add14_b = 0.0;
+    rtDW.DiscreteTimeIntegrator_d = 0.0;
   }
 
   // End of Saturate: '<S1>/Accel[%]1'
@@ -743,13 +731,14 @@ void BMS::step()
   // Product: '<S1>/Divide1' incorporates:
   //   Gain: '<S1>/Accel1'
 
-  rtDW.Divide36 = (0.01 * rtDW.rtb_Add14_b) * rtDW.F_rolling;
+  rtDW.Motor_TorqueNm_d = (0.01 * rtDW.DiscreteTimeIntegrator_d) *
+    rtDW.F_rolling;
 
   // FromWorkspace: '<S1>/From Workspace18'
   {
     double *pDataValues{ (double *) rtDW.FromWorkspace18_PWORK.DataPtr };
 
-    rtDW.rtb_Add14_b = pDataValues[0];
+    rtDW.DiscreteTimeIntegrator_d = pDataValues[0];
   }
 
   // Product: '<S1>/Divide33' incorporates:
@@ -757,21 +746,22 @@ void BMS::step()
   //   Product: '<S1>/Divide27'
   //   Sum: '<S1>/Add1'
 
-  rtDW.Divide2 = (((0.01 * rtDW.Divide2) * rtDW.F_rolling) + rtDW.Divide36) *
-    rtDW.rtb_Add14_b;
+  rtDW.F_rolling = (((0.01 * rtDW.Divide2) * rtDW.F_rolling) +
+                    rtDW.Motor_TorqueNm_d) * rtDW.DiscreteTimeIntegrator_d;
 
   // FromWorkspace: '<S1>/From Workspace20'
   {
     double *pDataValues{ (double *) rtDW.FromWorkspace20_PWORK.DataPtr };
 
-    rtDW.rtb_Add14_b = pDataValues[0];
+    rtDW.DiscreteTimeIntegrator_d = pDataValues[0];
   }
 
   // Sum: '<S1>/Add14' incorporates:
   //   Gain: '<S1>/BPP[%]*MAX_Brake_Force[N]1'
   //   Product: '<S1>/Divide34'
 
-  rtDW.rtb_Add14_b = (100.0 * rtDW.Add13) + (rtDW.Divide2 / rtDW.rtb_Add14_b);
+  rtDW.DiscreteTimeIntegrator_d = (100.0 * rtDW.Add13) + (rtDW.F_rolling /
+    rtDW.DiscreteTimeIntegrator_d);
 
   // FromWorkspace: '<S1>/Rolling_Loss1'
   {
@@ -786,30 +776,6 @@ void BMS::step()
 
     rtDW.FromWorkspace3 = pDataValues[0];
   }
-
-  if (b) {
-    // RelationalOperator: '<S4>/Compare' incorporates:
-    //   Constant: '<S4>/Constant'
-    //   Inport: '<Root>/ego_velocity'
-
-    rtDW.Compare = (rtU.ego_velocity > 1.0);
-  }
-
-  // Switch: '<S1>/Switch1'
-  if (rtDW.Compare) {
-    // Switch: '<S1>/Switch1' incorporates:
-    //   Inport: '<Root>/Mass_kg'
-    //   Product: '<S1>/Divide3'
-
-    rtDW.F_rolling = (rtDW.Rolling_Loss1 * rtDW.FromWorkspace3) * rtU.Mass_kg;
-  } else {
-    // Switch: '<S1>/Switch1' incorporates:
-    //   Constant: '<S1>/Constant3'
-
-    rtDW.F_rolling = 10.0;
-  }
-
-  // End of Switch: '<S1>/Switch1'
 
   // FromWorkspace: '<S1>/Friction_Loss1'
   {
@@ -839,11 +805,11 @@ void BMS::step()
     //   Inport: '<Root>/IVD'
 
     if (rtU.IVD > 100.0) {
-      rtDW.Divide36 = 100.0;
+      rtDW.Motor_TorqueNm_d = 100.0;
     } else if (rtU.IVD < 0.0) {
-      rtDW.Divide36 = 0.0;
+      rtDW.Motor_TorqueNm_d = 0.0;
     } else {
-      rtDW.Divide36 = rtU.IVD;
+      rtDW.Motor_TorqueNm_d = rtU.IVD;
     }
 
     // End of Saturate: '<S1>/Saturation2'
@@ -852,25 +818,20 @@ void BMS::step()
     //   Inport: '<Root>/Mode'
 
     if (rtU.Mode >= 1.0) {
-      // Switch: '<S1>/Switch5' incorporates:
+      // Outport: '<Root>/Aero' incorporates:
       //   MATLAB Function: '<S1>/Drag coefficient for FV'
 
-      rtDW.Switch5 = (std::exp((rtDW.Divide36 - 8.0) * -0.068) * -0.4629) +
+      rtY.Aero = (std::exp((rtDW.Motor_TorqueNm_d - 8.0) * -0.068) * -0.4629) +
         0.6441;
     } else {
-      // Switch: '<S1>/Switch5' incorporates:
+      // Outport: '<Root>/Aero' incorporates:
       //   MATLAB Function: '<S1>/Drag coefficient for LV'
 
-      rtDW.Switch5 = (std::exp((rtDW.Divide36 - 8.0) * -0.1002) * -0.1012) +
+      rtY.Aero = (std::exp((rtDW.Motor_TorqueNm_d - 8.0) * -0.1002) * -0.1012) +
         0.6441;
     }
 
     // End of Switch: '<S1>/Switch5'
-
-    // Math: '<S1>/Square1' incorporates:
-    //   Inport: '<Root>/ego_velocity'
-
-    rtDW.Square1 = rtU.ego_velocity * rtU.ego_velocity;
   }
 
   // FromWorkspace: '<S1>/From Workspace'
@@ -887,9 +848,13 @@ void BMS::step()
     rtDW.Step = pDataValues[0];
   }
 
-  // Product: '<S1>/Divide23'
-  rtDW.Divide36 = ((rtDW.Switch5 * rtDW.Square1) * rtDW.UnitConversion4) *
-    rtDW.Step;
+  // Product: '<S1>/Divide23' incorporates:
+  //   Inport: '<Root>/ego_velocity'
+  //   Math: '<S1>/Square1'
+  //   Outport: '<Root>/Aero'
+
+  rtDW.Motor_TorqueNm_d = (((rtU.ego_velocity * rtU.ego_velocity) * rtY.Aero) *
+    rtDW.UnitConversion4) * rtDW.Step;
 
   // FromWorkspace: '<S1>/From Workspace15'
   {
@@ -898,13 +863,28 @@ void BMS::step()
     rtDW.Step = pDataValues[0];
   }
 
+  // Switch: '<S1>/Switch1' incorporates:
+  //   Constant: '<S1>/Constant3'
+  //   Constant: '<S4>/Constant'
+  //   Inport: '<Root>/Mass_kg'
+  //   Inport: '<Root>/ego_velocity'
+  //   Product: '<S1>/Divide3'
+  //   RelationalOperator: '<S4>/Compare'
+
+  if (rtU.ego_velocity > 1.0) {
+    rtDW.F_rolling = (rtDW.Rolling_Loss1 * rtDW.FromWorkspace3) * rtU.Mass_kg;
+  } else {
+    rtDW.F_rolling = 10.0;
+  }
+
   // Product: '<S1>/Divide28' incorporates:
   //   Gain: '<S1>/Gain'
   //   Sum: '<S1>/Add11'
   //   Sum: '<S1>/Add15'
+  //   Switch: '<S1>/Switch1'
 
-  rtDW.Add13 = (rtDW.F_rolling + rtDW.Add13 + rtDW.Divide2 + (0.5 *
-    rtDW.Divide36) + rtDW.rtb_Add14_b) * rtDW.Step;
+  rtDW.F_rolling = (rtDW.F_rolling + rtDW.Add13 + rtDW.Divide2 + (0.5 *
+    rtDW.Motor_TorqueNm_d) + rtDW.DiscreteTimeIntegrator_d) * rtDW.Step;
 
   // FromWorkspace: '<S1>/From Workspace14'
   {
@@ -916,7 +896,7 @@ void BMS::step()
   // Step: '<S1>/Step' incorporates:
   //   Product: '<S1>/Divide29'
 
-  rtDW.Step = rtDW.Add13 / rtDW.Step;
+  rtDW.Step = rtDW.F_rolling / rtDW.Step;
 
   // UnitConversion: '<S1>/Unit Conversion4'
   // Unit Conversion - from: rpm to: rad/s
@@ -948,23 +928,23 @@ void BMS::step()
   // MATLAB Function: '<S1>/ Normalization' incorporates:
   //   Lookup_n-D: '<S1>/SOC-Vol1'
 
-  rtDW.Add13 = rtDW.SOCTemp;
-  rtDW.Divide2 = rtDW.Vsoc;
-  rtDW.Divide36 = rtDW.Motor_Current_cell;
+  rtDW.F_rolling = rtDW.SOCTemp;
+  rtDW.Add13 = rtDW.Vsoc;
+  rtDW.Divide2 = rtDW.Motor_Current_cell;
   if (rtDW.SOCTemp < 19.1) {
-    rtDW.Add13 = 19.1;
+    rtDW.F_rolling = 19.1;
   } else if (rtDW.SOCTemp > 25.0) {
-    rtDW.Add13 = 25.0;
+    rtDW.F_rolling = 25.0;
   }
 
   if (rtDW.Vsoc > 4.1679) {
-    rtDW.Divide2 = 4.1679;
+    rtDW.Add13 = 4.1679;
   }
 
   if (rtDW.Motor_Current_cell < -1.0) {
-    rtDW.Divide36 = -1.0;
+    rtDW.Divide2 = -1.0;
   } else if (rtDW.Motor_Current_cell > 7.0) {
-    rtDW.Divide36 = 7.0;
+    rtDW.Divide2 = 7.0;
   }
 
   // Outputs for Atomic SubSystem: '<S1>/LSTM'
@@ -972,9 +952,9 @@ void BMS::step()
   // SignalConversion generated from: '<S29>/MaskMM' incorporates:
   //   MATLAB Function: '<S1>/ Normalization'
 
-  rtDW.Add13 = (rtDW.Add13 - 19.1) / 5.8999999999999986;
-  rtDW.Divide2 = (rtDW.Divide2 - 3.1724) / 0.99550000000000027;
-  rtDW.Divide36 = (rtDW.Divide36 - -1.0) / 8.0;
+  rtDW.Motor_TorqueNm_d = (rtDW.F_rolling - 19.1) / 5.8999999999999986;
+  rtDW.Add13 = (rtDW.Add13 - 3.1724) / 0.99550000000000027;
+  rtDW.Divide2 = (rtDW.Divide2 - -1.0) / 8.0;
   for (rtDW.knt = 0; rtDW.knt <= 1022; rtDW.knt += 2) {
     // Product: '<S29>/W*x' incorporates:
     //   Constant: '<S29>/InputWeights'
@@ -982,10 +962,10 @@ void BMS::step()
 
     _mm_storeu_pd(&rtDW.Wx[rtDW.knt], _mm_add_pd(_mm_add_pd(_mm_mul_pd
       (_mm_loadu_pd(&rtConstP.InputWeights_Value[rtDW.knt + 1024]), _mm_set1_pd
-       (rtDW.Divide2)), _mm_mul_pd(_mm_loadu_pd
-      (&rtConstP.InputWeights_Value[rtDW.knt]), _mm_set1_pd(rtDW.Add13))),
-      _mm_mul_pd(_mm_loadu_pd(&rtConstP.InputWeights_Value[rtDW.knt + 2048]),
-                 _mm_set1_pd(rtDW.Divide36))));
+       (rtDW.Add13)), _mm_mul_pd(_mm_loadu_pd
+      (&rtConstP.InputWeights_Value[rtDW.knt]), _mm_set1_pd
+      (rtDW.Motor_TorqueNm_d))), _mm_mul_pd(_mm_loadu_pd
+      (&rtConstP.InputWeights_Value[rtDW.knt + 2048]), _mm_set1_pd(rtDW.Divide2))));
   }
 
   if ((&rtM)->isMajorTimeStep()) {
@@ -1042,13 +1022,13 @@ void BMS::step()
       //   Sum: '<S70>/Wx+Rh+b'
 
       for (rtDW.knt = 0; rtDW.knt < 1024; rtDW.knt++) {
-        rtDW.Divide36 = 0.0;
+        rtDW.F_rolling = 0.0;
         for (rtDW.i = 0; rtDW.i < 256; rtDW.i++) {
-          rtDW.Divide36 += rtConstP.RecurrentWeights_Value[(rtDW.i << 10) +
+          rtDW.F_rolling += rtConstP.RecurrentWeights_Value[(rtDW.i << 10) +
             rtDW.knt] * rtDW.HiddenStateDelay_DSTATE_i[rtDW.i];
         }
 
-        rtDW.WxRhb[rtDW.knt] = rtDW.Wx[rtDW.knt] + rtDW.Divide36 +
+        rtDW.WxRhb[rtDW.knt] = rtDW.Wx[rtDW.knt] + rtDW.F_rolling +
           rtConstP.Bias_Value_g[rtDW.knt];
       }
 
@@ -1176,11 +1156,11 @@ void BMS::step()
       // Product: '<S63>/W*x' incorporates:
       //   Constant: '<S63>/InputWeights'
 
-      rtDW.Divide36 = 0.0;
+      rtDW.Divide2 = 0.0;
       for (rtDW.i = 0; rtDW.i < 256; rtDW.i++) {
         // Outputs for Atomic SubSystem: '<S9>/dropout_1'
-        rtDW.Divide36 += rtConstP.InputWeights_Value_g[(rtDW.i << 9) + rtDW.knt]
-          * rtDW.Assignment_l[rtDW.i];
+        rtDW.Divide2 += rtConstP.InputWeights_Value_g[(rtDW.i << 9) + rtDW.knt] *
+          rtDW.Assignment_l[rtDW.i];
 
         // End of Outputs for SubSystem: '<S9>/dropout_1'
       }
@@ -1190,7 +1170,7 @@ void BMS::step()
       //   Constant: '<S63>/InputWeights'
       //   SignalConversion generated from: '<S15>/In1'
 
-      rtDW.Wx_m[rtDW.knt] = rtDW.Divide36;
+      rtDW.Wx_m[rtDW.knt] = rtDW.Divide2;
     }
 
     // End of Product: '<S63>/W*x'
@@ -1244,9 +1224,9 @@ void BMS::step()
         // Product: '<S71>/R*h_t-1' incorporates:
         //   Constant: '<S71>/RecurrentWeights'
 
-        rtDW.Divide36 = 0.0;
+        rtDW.Divide2 = 0.0;
         for (rtDW.i = 0; rtDW.i < 128; rtDW.i++) {
-          rtDW.Divide36 += rtConstP.RecurrentWeights_Value_b[(rtDW.i << 9) +
+          rtDW.Divide2 += rtConstP.RecurrentWeights_Value_b[(rtDW.i << 9) +
             rtDW.knt] * rtDW.rtb_Tanh_k[rtDW.i];
         }
 
@@ -1256,7 +1236,7 @@ void BMS::step()
         //   Product: '<S71>/R*h_t-1'
         //   Selector: '<S62>/Selector1'
 
-        rtDW.WxRhb[rtDW.knt] = rtDW.Wx_m[rtDW.knt] + rtDW.Divide36 +
+        rtDW.WxRhb[rtDW.knt] = rtDW.Wx_m[rtDW.knt] + rtDW.Divide2 +
           rtConstP.Bias_Value_f[rtDW.knt];
       }
 
@@ -1368,10 +1348,11 @@ void BMS::step()
     //   Constant: '<S17>/Weights'
     //   SignalConversion generated from: '<S16>/In1'
 
-    rtDW.Add13 = 0.0;
+    rtDW.F_rolling = 0.0;
     for (rtDW.knt = 0; rtDW.knt < 128; rtDW.knt++) {
       // Outputs for Atomic SubSystem: '<S9>/dropout_2'
-      rtDW.Add13 += rtConstP.Weights_Value[rtDW.knt] * rtDW.Assignment[rtDW.knt];
+      rtDW.F_rolling += rtConstP.Weights_Value[rtDW.knt] *
+        rtDW.Assignment[rtDW.knt];
 
       // End of Outputs for SubSystem: '<S9>/dropout_2'
     }
@@ -1384,7 +1365,7 @@ void BMS::step()
       //   Product: '<S17>/Matrix Multiply'
       //   Sum: '<S24>/Add'
 
-      rtDW.ImpAsg_InsertedFor_Out1_at_ = rtDW.Add13 - 0.015775660052895546;
+      rtDW.ImpAsg_InsertedFor_Out1_at_ = rtDW.F_rolling - 0.015775660052895546;
     }
 
     // End of Outputs for SubSystem: '<S23>/AddForEachSeq'
@@ -1398,25 +1379,25 @@ void BMS::step()
     //   DataStoreRead: '<S11>/Data Store ReadP'
     //   DataStoreRead: '<S11>/Data Store ReadX'
 
-    //  ¿¹ÃøµÈ SOC°¡ ±×´ë·Î ³ª°¡µµ·Ï ¼³Á¤
-    rtDW.Add13 = std::fmax(1.4901161193847656E-8, 1.4901161193847656E-8 * std::
-      abs(rtDW.x));
+    //  ������ SOC�� �״�� �������� ����
+    rtDW.F_rolling = std::fmax(1.4901161193847656E-8, 1.4901161193847656E-8 *
+      std::abs(rtDW.x));
 
-    //  ¿¹ÃøµÈ SOC°¡ ±×´ë·Î ³ª°¡µµ·Ï ¼³Á¤
-    rtDW.Add13 = (rtDW.x + rtDW.Add13 - rtDW.x) / rtDW.Add13;
+    //  ������ SOC�� �״�� �������� ����
+    rtDW.F_rolling = (rtDW.x + rtDW.F_rolling - rtDW.x) / rtDW.F_rolling;
 
-    //  ¿¹ÃøµÈ SOC°¡ ±×´ë·Î ³ª°¡µµ·Ï ¼³Á¤
-    rtDW.Divide2 = qrFactor(rtDW.Add13, rtDW.P_k, 0.1);
-    rtDW.Divide2 = trisolve(rtDW.Divide2, trisolve(rtDW.Divide2, (rtDW.P_k *
-      rtDW.P_k) * rtDW.Add13));
+    //  ������ SOC�� �״�� �������� ����
+    rtDW.Add13 = qrFactor(rtDW.F_rolling, rtDW.P_k, 0.1);
+    rtDW.Add13 = trisolve(rtDW.Add13, trisolve(rtDW.Add13, (rtDW.P_k * rtDW.P_k)
+      * rtDW.F_rolling));
 
     // DataStoreWrite: '<S11>/Data Store WriteP' incorporates:
     //   Constant: '<S8>/R1'
     //   DataStoreRead: '<S11>/Data Store ReadP'
     //   MATLABSystem: '<S11>/MATLAB System'
     //
-    rtDW.P_k = qrFactor((-rtDW.Divide2 * rtDW.Add13) + 1.0, rtDW.P_k,
-                        rtDW.Divide2 * 0.1);
+    rtDW.P_k = qrFactor((-rtDW.Add13 * rtDW.F_rolling) + 1.0, rtDW.P_k,
+                        rtDW.Add13 * 0.1);
 
     // Outputs for Atomic SubSystem: '<S9>/layer'
     // DataStoreWrite: '<S11>/Data Store WriteX' incorporates:
@@ -1432,7 +1413,7 @@ void BMS::step()
     //   Operator: exp
 
     rtDW.x += ((1.0 / (std::exp(-rtDW.ImpAsg_InsertedFor_Out1_at_) + 1.0)) -
-               rtDW.x) * rtDW.Divide2;
+               rtDW.x) * rtDW.Add13;
 
     // End of Outputs for SubSystem: '<S9>/layer'
     // End of Outputs for SubSystem: '<S8>/Correct1'
@@ -1475,7 +1456,7 @@ void BMS::step()
   // Product: '<S1>/Divide15' incorporates:
   //   Inport: '<Root>/Mass_kg'
 
-  rtDW.Veh_acceleartion = rtDW.rtb_Add14_b / rtU.Mass_kg;
+  rtDW.Veh_acceleartion = rtDW.DiscreteTimeIntegrator_d / rtU.Mass_kg;
   if (b) {
     // Outputs for Atomic SubSystem: '<S8>/Predict'
     // MATLABSystem: '<S13>/MATLAB System' incorporates:
@@ -1487,58 +1468,58 @@ void BMS::step()
       1.4901161193847656E-8 * std::abs(rtDW.x))) * rtDW.P_k;
     rtDW.M[1] = 0.022360679774997897;
     for (rtDW.b_i = 0; rtDW.b_i < 1; rtDW.b_i++) {
-      rtDW.Divide2 = rtDW.M[0];
-      rtDW.Add13 = xnrm2(1, rtDW.M, 2);
-      if (rtDW.Add13 != 0.0) {
-        rtDW.Divide36 = rt_hypotd_snf_e(rtDW.M[0], rtDW.Add13);
+      rtDW.Add13 = rtDW.M[0];
+      rtDW.DiscreteTimeIntegrator_d = xnrm2(1, rtDW.M, 2);
+      if (rtDW.DiscreteTimeIntegrator_d != 0.0) {
+        rtDW.Divide2 = rt_hypotd_snf_e(rtDW.M[0], rtDW.DiscreteTimeIntegrator_d);
         if (rtDW.M[0] >= 0.0) {
-          rtDW.Divide36 = -rtDW.Divide36;
+          rtDW.Divide2 = -rtDW.Divide2;
         }
 
-        if (std::abs(rtDW.Divide36) < 1.0020841800044864E-292) {
+        if (std::abs(rtDW.Divide2) < 1.0020841800044864E-292) {
           rtDW.knt = -1;
           do {
             rtDW.knt++;
-            rtDW.rtb_Add14_b = rtDW.M[1];
+            rtDW.DiscreteTimeIntegrator_d = rtDW.M[1];
             for (rtDW.s28_iter = 2; rtDW.s28_iter < 3; rtDW.s28_iter++) {
-              rtDW.rtb_Add14_b *= 9.9792015476736E+291;
+              rtDW.DiscreteTimeIntegrator_d *= 9.9792015476736E+291;
             }
 
-            rtDW.M[1] = rtDW.rtb_Add14_b;
-            rtDW.Divide36 *= 9.9792015476736E+291;
+            rtDW.M[1] = rtDW.DiscreteTimeIntegrator_d;
             rtDW.Divide2 *= 9.9792015476736E+291;
-          } while ((std::abs(rtDW.Divide36) < 1.0020841800044864E-292) &&
+            rtDW.Add13 *= 9.9792015476736E+291;
+          } while ((std::abs(rtDW.Divide2) < 1.0020841800044864E-292) &&
                    ((rtDW.knt + 1) < 20));
 
-          rtDW.Divide36 = rt_hypotd_snf_e(rtDW.Divide2, xnrm2(1, rtDW.M, 2));
-          if (rtDW.Divide2 >= 0.0) {
-            rtDW.Divide36 = -rtDW.Divide36;
+          rtDW.Divide2 = rt_hypotd_snf_e(rtDW.Add13, xnrm2(1, rtDW.M, 2));
+          if (rtDW.Add13 >= 0.0) {
+            rtDW.Divide2 = -rtDW.Divide2;
           }
 
-          rtDW.Divide2 = 1.0 / (rtDW.Divide2 - rtDW.Divide36);
+          rtDW.Add13 = 1.0 / (rtDW.Add13 - rtDW.Divide2);
           for (rtDW.s28_iter = 2; rtDW.s28_iter < 3; rtDW.s28_iter++) {
-            rtDW.rtb_Add14_b *= rtDW.Divide2;
+            rtDW.DiscreteTimeIntegrator_d *= rtDW.Add13;
           }
 
-          rtDW.M[1] = rtDW.rtb_Add14_b;
+          rtDW.M[1] = rtDW.DiscreteTimeIntegrator_d;
           for (rtDW.s28_iter = 0; rtDW.s28_iter <= rtDW.knt; rtDW.s28_iter++) {
-            rtDW.Divide36 *= 1.0020841800044864E-292;
+            rtDW.Divide2 *= 1.0020841800044864E-292;
           }
 
-          rtDW.Divide2 = rtDW.Divide36;
+          rtDW.Add13 = rtDW.Divide2;
         } else {
-          rtDW.Divide2 = 1.0 / (rtDW.M[0] - rtDW.Divide36);
-          rtDW.rtb_Add14_b = rtDW.M[1];
+          rtDW.Add13 = 1.0 / (rtDW.M[0] - rtDW.Divide2);
+          rtDW.DiscreteTimeIntegrator_d = rtDW.M[1];
           for (rtDW.s28_iter = 2; rtDW.s28_iter < 3; rtDW.s28_iter++) {
-            rtDW.rtb_Add14_b *= rtDW.Divide2;
+            rtDW.DiscreteTimeIntegrator_d *= rtDW.Add13;
           }
 
-          rtDW.M[1] = rtDW.rtb_Add14_b;
-          rtDW.Divide2 = rtDW.Divide36;
+          rtDW.M[1] = rtDW.DiscreteTimeIntegrator_d;
+          rtDW.Add13 = rtDW.Divide2;
         }
       }
 
-      rtDW.M[0] = rtDW.Divide2;
+      rtDW.M[0] = rtDW.Add13;
     }
 
     // DataStoreWrite: '<S13>/Data Store WriteP' incorporates:
@@ -1552,10 +1533,10 @@ void BMS::step()
     rtDW.x = rtDW.Minus1;
 
     // End of Outputs for SubSystem: '<S8>/Predict'
-
-    // Gain: '<S127>/Integral Gain'
-    rtDW.IntegralGain = 0.01 * rtDW.SpeedDifferent;
   }
+
+  // Gain: '<S127>/Integral Gain'
+  rtDW.IntegralGain = 0.01 * rtDW.SpeedDifferent;
 
   // Step: '<S1>/Step'
   rtDW.Step = !((&rtM)->Timing.t[0] < 10.0);
@@ -1572,7 +1553,7 @@ void BMS::step()
   }
 
   // End of Switch: '<S1>/SOC switch'
-  // End of Outputs for SubSystem: '<Root>/BMS'
+  // End of Outputs for SubSystem: '<Root>/BMS with LSTM'
 
   // Outport: '<Root>/Accel[ms2]'
   rtY.Accelms2 = rtDW.Veh_acceleartion;
@@ -1585,7 +1566,7 @@ void BMS::step()
   }
 
   if ((&rtM)->isMajorTimeStep()) {
-    // Update for Atomic SubSystem: '<Root>/BMS'
+    // Update for Atomic SubSystem: '<Root>/BMS with LSTM'
     if ((&rtM)->isMajorTimeStep()) {
       // Update for UnitDelay: '<S1>/SOC_t-2'
       rtDW.SOC_t2_DSTATE = rtDW.SOCswitch;
@@ -1600,7 +1581,7 @@ void BMS::step()
       rtDW.DiscreteTimeIntegrator1_DSTATE += 0.01 * rtDW.DiscreteTimeIntegrator;
     }
 
-    // End of Update for SubSystem: '<Root>/BMS'
+    // End of Update for SubSystem: '<Root>/BMS with LSTM'
   }                                    // end MajorTimeStep
 
   if ((&rtM)->isMajorTimeStep()) {
@@ -1633,14 +1614,14 @@ void BMS::BMS_derivatives()
   BMS::XDot *_rtXdot;
   _rtXdot = ((XDot *) (&rtM)->derivs);
 
-  // Derivatives for Atomic SubSystem: '<Root>/BMS'
+  // Derivatives for Atomic SubSystem: '<Root>/BMS with LSTM'
   // Derivatives for Integrator: '<S130>/Integrator'
   _rtXdot->Integrator_CSTATE = rtDW.IntegralGain;
 
   // Derivatives for Integrator: '<S125>/Filter'
   _rtXdot->Filter_CSTATE = rtDW.FilterCoefficient;
 
-  // End of Derivatives for SubSystem: '<Root>/BMS'
+  // End of Derivatives for SubSystem: '<Root>/BMS with LSTM'
 }
 
 // Model initialize function
@@ -1682,7 +1663,7 @@ void BMS::initialize()
   (&rtM)->setTPtr(&(&rtM)->Timing.tArray[0]);
   (&rtM)->Timing.stepSize0 = 0.01;
 
-  // SystemInitialize for Atomic SubSystem: '<Root>/BMS'
+  // SystemInitialize for Atomic SubSystem: '<Root>/BMS with LSTM'
   // Start for FromWorkspace: '<S1>/From Workspace19'
   {
     static double pTimeValues0[]{ 1.0 } ;
@@ -1880,7 +1861,7 @@ void BMS::initialize()
   // End of SystemInitialize for SubSystem: '<S20>/ForIteratorSubsystem'
   // End of SystemInitialize for SubSystem: '<S9>/lstm_2'
   // End of SystemInitialize for SubSystem: '<S1>/LSTM'
-  // End of SystemInitialize for SubSystem: '<Root>/BMS'
+  // End of SystemInitialize for SubSystem: '<Root>/BMS with LSTM'
 }
 
 BMS::XDis* BMS::RT_MODEL::getContStateDisabled() const

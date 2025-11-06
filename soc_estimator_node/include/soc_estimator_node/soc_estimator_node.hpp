@@ -7,12 +7,23 @@
 #include "ros2_msg/msg/truck_command.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "std_msgs/msg/int32.hpp"
+#include "std_msgs/msg/u_int32.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "BMS.h"
 #include <chrono>
 #include <unistd.h> 
 #include <fstream>
+
+struct InputsReady {
+  uint32_t frame_id = 0;
+  uint32_t ego_vel = 0;
+  uint32_t refer_vel  = 0;
+  uint32_t ego_enu = 0;
+  uint32_t target_enu = 0;
+  
+  bool computed = false;
+};
 
 
 class SOCEstimatorNode : public rclcpp::Node
@@ -25,7 +36,9 @@ private:
     void formation_end_callback(const std_msgs::msg::Int32::SharedPtr msg, int id);
     double compute_distance(const geometry_msgs::msg::Point &a, const geometry_msgs::msg::Point &b);
     void start_baseline_measurement();
-    void timer_callback();
+    void compute_SOC();
+    void on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg);
+    bool all_inputs_ready() const;
 
     //void publish_output(double soc, double throttle, double brake);
 
@@ -36,17 +49,23 @@ private:
     int max_trucks_ = 3; 
     std::vector<int> last_flag;
 
+    mutable std::mutex ready_mtx_;
+    InputsReady ready_;
+
     BMS BMSObj;
 
     rclcpp::Publisher<ros2_msg::msg::TruckStatus>::SharedPtr status_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr aero_pub_;
+    rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr sync_soc_pub_;
     //rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr soc_pub_;
     //rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr throttle_pub_;
     //rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr brake_pub_;
 
-    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr speed_sub_;
-    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr reference_sub_;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr ego_sub_;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr target_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr vel_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr reference_vel_sub_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr pos_sub_;
+    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr target_pos_sub_;
+    rclcpp::Subscription<std_msgs::msg::UInt32>::SharedPtr frame_sub_;
 
     rclcpp::Subscription<ros2_msg::msg::TruckCommand>::SharedPtr command_sub_;
     std::vector<rclcpp::Subscription<std_msgs::msg::Int32>::SharedPtr> formation_subs_;
@@ -59,17 +78,23 @@ private:
     geometry_msgs::msg::Point pos_at_change_start_;
    	rclcpp::Time time_at_change_start_;
 	double soc_at_change_start_;
+    geometry_msgs::msg::Point pos_at_change_end_;
+   	rclcpp::Time time_at_change_end_;
+	double soc_at_change_end_;
+
 	bool is_measuring_change_ = false;
 
     // 위치 정보
     geometry_msgs::msg::Point ego_pos;
     geometry_msgs::msg::Point target_pos;
 
-    double current_speed_ = 0.0;
+    double current_speed_ = 90.0;
     double reference_velocity_ = 0.0; 
-    double last_soc_= 100.0;
-    //double last_pos_= 0.0;
-    //double last_vel_= 0.0;
+    double output_distance_= 0.0;
+    double output_speed_= 0.0;
+    double output_soc_= 100.0;
+    double output_aerodrag_= 0.0;
+
     bool mode_changed_ = false;
     rclcpp::Time start_time_;
     geometry_msgs::msg::Point last_pos_;
