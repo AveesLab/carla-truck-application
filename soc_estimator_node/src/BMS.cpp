@@ -817,18 +817,20 @@ void BMS::step()
     // Switch: '<S1>/Switch5' incorporates:
     //   Inport: '<Root>/Mode'
 
-    if (rtU.Mode >= 1.0) {
+    if (rtU.Mode == 1.0) {
       // Outport: '<Root>/Aero' incorporates:
       //   MATLAB Function: '<S1>/Drag coefficient for FV'
 
       rtY.Aero = (std::exp((rtDW.Motor_TorqueNm_d - 8.0) * -0.068) * -0.4629) +
         0.6441;
-    } else {
+    } else if (rtU.Mode == 0.0) {
       // Outport: '<Root>/Aero' incorporates:
       //   MATLAB Function: '<S1>/Drag coefficient for LV'
 
       rtY.Aero = (std::exp((rtDW.Motor_TorqueNm_d - 8.0) * -0.1002) * -0.1012) +
         0.6441;
+    } else {
+      rtY.Aero = 0.6441;
     }
 
     // End of Switch: '<S1>/Switch5'
