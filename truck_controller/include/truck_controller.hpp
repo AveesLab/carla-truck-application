@@ -137,6 +137,9 @@ private:
     // *changed
     int formation_change_flag_=0;
     bool emergency_stop_scenario_flag_     = false;// set-scenario
+    bool cut_in_scenario_flag_ = false;
+    bool traffic_jam_scenario_flag_ = false;
+    bool any_scenario_flag_ = false;
 
     // *changed
     double truck0_velocity_;
@@ -190,6 +193,8 @@ private:
     rclcpp::Subscription<ros2_msg::msg::TruckCommand>::SharedPtr sub_formation_command_;
     rclcpp::Subscription<std_msgs::msg::UInt32>::SharedPtr sub_frame_;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_emergency_stop_scenario_flag_; //set-scenario
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_cut_in_scenario_flag_; //set-scenario
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_traffic_jam_scenario_flag_; //set-scenario
 
 
     // *changed
@@ -208,6 +213,8 @@ private:
     void truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg);
     void emergency_stop_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg);// set-scenario
+    void cut_in_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg);// set-scenario
+    void traffic_jam_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg);// set-scenario
 
     void current_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
     void truck0_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
@@ -247,5 +254,7 @@ private:
     void update_formation_id();
     bool check_stable_gaps();
     void mission_taken_on_EMERGENCY_STOP();// set-scenario
+    void mission_taken_on_TRAFFIC_JAM();// set-scenario
+    void mission_taken_on_GAP_UP();// set-scenario
 
 };

@@ -175,6 +175,8 @@ TruckController::TruckController(int argu_id)
 
   // set-scenario
   sub_emergency_stop_scenario_flag_ = this->create_subscription<std_msgs::msg::Bool>("/emergency_stop_scenario_flag", 10, std::bind(&TruckController::emergency_stop_scenario_flag_callback, this, std::placeholders::_1));
+  sub_cut_in_scenario_flag_ = this->create_subscription<std_msgs::msg::Bool>("/cut_in_scenario_flag", 10, std::bind(&TruckController::cut_in_scenario_flag_callback, this, std::placeholders::_1));
+  sub_traffic_jam_scenario_flag_ = this->create_subscription<std_msgs::msg::Bool>("/traffic_jam_scenario_flag", 10, std::bind(&TruckController::traffic_jam_scenario_flag_callback, this, std::placeholders::_1));
 
   //RCLCPP_INFO(this->get_logger(), "TruckController node initialized (IMU-less GPS Steer Mode). Yaw will be initialized on first control cycle.");
 
@@ -304,17 +306,54 @@ void TruckController::formation_command_callback(const ros2_msg::msg::TruckComma
 // set-scenario
 void TruckController::emergency_stop_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg) {
     
-    if(lane_change_flag_ == true)
+    if(lane_change_flag_ == true || any_scenario_flag_ == true)
     {//prevent cut in scenario
         emergency_stop_scenario_flag_ = false;
         std::cout<<"blocking _scenario_flag callback"<<std::endl;
     }
     else if(msg->data == true)
     {
+        any_scenario_flag_ = true;
         emergency_stop_scenario_flag_ = msg->data;
         std::cout<<"emergency_stop_scenario_flag_ : "<<emergency_stop_scenario_flag_<<std::endl;
     }
     else {emergency_stop_scenario_flag_ = false;}
+
+}
+
+void TruckController::cut_in_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+    
+    if(lane_change_flag_ == true || any_scenario_flag_ == true)
+    {//prevent cut in scenario
+
+        cut_in_scenario_flag_ = false;
+        std::cout<<"blocking cut_in_scenario_flag callback"<<std::endl;
+    }
+    else if(msg->data == true)
+    {
+        any_scenario_flag_ = true;
+        cut_in_scenario_flag_ = msg->data;
+        std::cout<<"cut_in_scenario_flag_ : "<<cut_in_scenario_flag_<<std::endl;
+    }
+    else {cut_in_scenario_flag_ = false;}
+
+}
+
+void TruckController::traffic_jam_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg) {
+    
+    if(lane_change_flag_ == true || any_scenario_flag_ == true)
+    {//prevent cut in scenario
+
+        traffic_jam_scenario_flag_ = false;
+        std::cout<<"blocking traffic_jam_scenario_flag callback"<<std::endl;
+    }
+    else if(msg->data == true)
+    {
+        any_scenario_flag_ = true;
+        traffic_jam_scenario_flag_ = msg->data;
+        std::cout<<"traffic_jam_scenario_flag_ : "<<traffic_jam_scenario_flag_<<std::endl;
+    }
+    else {traffic_jam_scenario_flag_ = false;}
 
 }
 
@@ -561,7 +600,8 @@ void TruckController::compute_control()
             // if(current_wp_idx_ > 21200 && current_wp_idx_<21300) lane_change_flag_=true;
             // set-scenario
             mission_taken_on_EMERGENCY_STOP();
-
+            mission_taken_on_TRAFFIC_JAM();
+            mission_taken_on_GAP_UP();
             
         }
 
@@ -1538,13 +1578,13 @@ void TruckController::check_overrun()
 
 void TruckController::mission_taken_on_EMERGENCY_STOP()
 {// set-scenario
-    if(emergency_stop_scenario_flag_ == false)
+    if(emergency_stop_scenario_flag_ == false || any_scenario_flag_ == true)
     {
         // set normal mission param back
         acc_speed_ = ACC_SPEED_;
         slow_speed_ = SLOW_SPEED_;
         stable_speed_ = STABLE_SPEED_;
-
+        any_scenario_flag_ = false;
         return;
 
     } 
@@ -1569,3 +1609,62 @@ void TruckController::mission_taken_on_EMERGENCY_STOP()
 
 }
 
+void TruckController::mission_taken_on_GAP_UP()
+{
+    if(cut_in_scenario_flag_ == false || any_scenario_flag_ == true)
+    {
+        desired_gap_ = 16.8;
+        min_gap_ = 14.0;
+        any_scenario_flag_ = false;
+        return;
+
+    } 
+    if(lane_change_flag_ == true) return;
+    else 
+    {
+
+            
+
+            // gap up 
+            if(formation_id_ == 1)
+            {
+                desired_gap_ = 42;
+                min_gap_ = 41.0;
+            }
+        
+    }
+
+
+}
+
+
+void TruckController::mission_taken_on_TRAFFIC_JAM()
+{
+    if(traffic_jam_scenario_flag_ == false || any_scenario_flag_ == true)
+    {
+        // set normal mission param back
+        acc_speed_ = ACC_SPEED_;
+        slow_speed_ = SLOW_SPEED_;
+        stable_speed_ = STABLE_SPEED_;
+        any_scenario_flag_ = false;
+        return;
+
+    } 
+    if(lane_change_flag_ == true) return;
+    else 
+    {
+        acc_speed_ = ACC_SPEED_*(0.6667);
+        slow_speed_ = SLOW_SPEED_*(0.6667);
+        stable_speed_ = STABLE_SPEED_*(0.6667);
+
+
+
+            
+
+            // jamming 
+
+        
+    }
+
+
+}
