@@ -41,14 +41,7 @@ class TruckPointPublisher(Node):
 
         self.is_get_drag = False
         self.is_get_frame_id = False
-        
-        self.drag_change_threshold = 1e-4  # drag 값 변화 임계값
-        
-        # 속도 유지를 위한 변수
-        self.velocity_restore_count = 0  # 속도 복원 카운터
-        self.velocity_restore_max_count = 20  # 속도 복원 최대 횟수 (약 0.2초)
-        self.saved_velocity = None  # 복원할 속도 저장
-        self.saved_angular_velocity = None  # 복원할 각속도 저장
+
 
     def on_frame_id(self, msg: UInt32):
         self.is_get_frame_id = True
@@ -58,41 +51,6 @@ class TruckPointPublisher(Node):
         self.target_drag = float(msg.data)
         self.is_get_drag = True
         
-    def _apply_drag_with_velocity_preservation(self, target_drag: float, pc: carla.VehiclePhysicsControl):
-        """
-        drag_coefficient 변경 시 속도를 보존하는 함수
-        apply_physics_control 후 속도를 강제로 유지
-        """
-        # [속도 백업] apply_physics_control 전에 현재 속도와 각속도 백업
-        v = self.vehicle.get_velocity()
-        w = self.vehicle.get_angular_velocity()
-        
-        # 속도 크기 확인 (너무 작으면 복원하지 않음)
-        speed_magnitude = (v.x**2 + v.y**2 + v.z**2)**0.5
-        if speed_magnitude < 0.1:  # 0.1 m/s 미만이면 복원하지 않음
-            # drag_coefficient 변경 및 적용
-            pc.drag_coefficient = target_drag
-            self.vehicle.apply_physics_control(pc)
-            self.last_applied_drag = target_drag
-            return
-        
-        # drag_coefficient 변경 및 적용
-        pc.drag_coefficient = target_drag
-        self.vehicle.apply_physics_control(pc)
-        self.last_applied_drag = target_drag
-        
-        # [속도 복원] 즉시 여러 번 복원 시도
-        # apply_physics_control 직후 속도가 0이 될 수 있으므로 즉시 복원
-        for _ in range(5):  # 5번 즉시 복원 시도
-            self.vehicle.set_target_velocity(v)
-            self.vehicle.set_target_angular_velocity(w)
-        
-        # 추가로 일정 시간 동안 속도 유지
-        self.saved_velocity = v
-        self.saved_angular_velocity = w
-        self.velocity_restore_count = self.velocity_restore_max_count
-
-
 
     def publish_point_callback(self):
         if not self.is_get_drag or not self.is_get_frame_id:
@@ -105,43 +63,40 @@ class TruckPointPublisher(Node):
             )
             return
 
+        try:
+            # 위치 퍼블리시
+            transform = self.vehicle.get_transform()
+            loc = transform.location
+            msg = Point()
+            msg.x = loc.x
+            msg.y = loc.y
+            msg.z = loc.z
+            self.publisher_.publish(msg)
 
-        # 위치 퍼블리시
-        transform = self.vehicle.get_transform()
-        loc = transform.location
-        msg = Point()
-        msg.x = loc.x
-        msg.y = loc.y
-        msg.z = loc.z
-        self.publisher_.publish(msg)
+            # drag 백업
 
-        # drag 적용: 변경 시에만 ApplyPhysicsControl 수행
-        want = float(self.target_drag)
-        pc = self.vehicle.get_physics_control()     
-        cur = getattr(pc, 'drag_coefficient', None)
-        
-        # drag 값이 변경되었는지 확인
-        if (cur is None) or (abs(cur - want) > self.drag_change_threshold):
-            self._apply_drag_with_velocity_preservation(want, pc)
-        
-        # 속도 복원 카운터가 남아있으면 계속 속도 유지
-        if self.velocity_restore_count > 0 and self.saved_velocity is not None:
-            self.vehicle.set_target_velocity(self.saved_velocity)
-            if self.saved_angular_velocity is not None:
-                self.vehicle.set_target_angular_velocity(self.saved_angular_velocity)
-            self.velocity_restore_count -= 1
-            if self.velocity_restore_count == 0:
-                # 복원 완료 후 정리
-                self.saved_velocity = None
-                self.saved_angular_velocity = None
 
-        self.is_get_drag = False
-        self.is_get_frame_id = False
-        self.pub_sync_drag.publish(Int32(data=1))
-        self.get_logger().info(f"[{self.get_namespace()}] Sync drag published")
+            # drag 적용: 변경 시에만 ApplyPhysicsControl 수행
+            want = float(self.target_drag)
+            pc = self.vehicle.get_physics_control()     
+            cur = getattr(pc, 'drag_coefficient', None)
+            if (cur is None) or (abs(cur - want) > 1e-4):
+                pc.drag_coefficient = want
+                self.vehicle.apply_physics_control(pc)
+                self.last_applied_drag = want
 
 
 
+
+            self.is_get_drag = False
+            self.is_get_frame_id = False
+            self.pub_sync_drag.publish(Int32(data=1))
+            self.get_logger().info(f"[{self.get_namespace()}] Sync drag published")
+
+
+
+        except Exception as e:
+            self.get_logger().error(f"[{self.get_namespace()}] Error in publish_point_callback: {e}")
 
 
 def main():
