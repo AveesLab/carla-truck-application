@@ -24,6 +24,7 @@
 #include <cmath>
 #include <limits>
 #include <array>
+#include <fstream>
 
 // 컨트롤러 상태 정의
 enum class ControllerState {
@@ -43,16 +44,11 @@ struct Missionidx
     int finish_idx;   
 };
 
-struct InputsReady {
-  uint32_t frame_id = 0;
-  uint32_t t0_enu = 0;
-  uint32_t t1_enu = 0;
-  uint32_t t2_enu = 0;
-  uint32_t t0_vel = 0;
-  uint32_t t1_vel = 0;
-  uint32_t t2_vel = 0;
-  
-  bool computed = false;
+struct ReadyState {
+    uint32_t frame_id{0};
+    std::array<uint32_t, 3> enu{};
+    std::array<uint32_t, 3> vel{};
+    bool computed{false};
 };
 
 class TruckController : public rclcpp::Node
@@ -72,18 +68,15 @@ private:
     const double SENSOR_TO_FRONT = 4.0;
     const double SENSOR_TO_REAR = 12.0;
     const double STEERING_THRESHOLD = 0.04;                  // 조향각 임계값
+    double MIN_GAP_;
+    double DESIRED_GAP_;
+    double EMERGENCY_GAP_ ;
 
     const Missionidx Curve_idx_1 ={300-300,1800+300};
     const Missionidx Curve_idx_2 ={78100-300,79600+300};
     const Missionidx Curve_idx_3= {155900-300,157400+300};
     const Missionidx Curve_idx_4= {233250-300,235750+300};
 
-    // const Missionidx Straight_idx_1 ={1800 + 7500,78100 - 7500};
-    // const Missionidx Straight_idx_2 ={79600 + 7500,155900 - 7500};
-    // const Missionidx Straight_idx_3 ={157400 + 7500,233250 - 7500}; 
-    // const Missionidx Straight_idx_4 ={235750 + 7500,311000 - 6000};
-
-    
     
     // 멤버 변수
     //int actor_id_;                     // 트럭 ID
@@ -145,7 +138,18 @@ private:
 
     // *changed
     int formation_change_flag_=0;
-    uint32_t last_frame_id_ = 0;
+    bool emergency_stop_scenario_flag_     = false;// set-scenario
+    bool cut_in_scenario_flag_ = false;
+    bool traffic_jam_scenario_flag_ = false;
+    bool simple_lane_change_flag_ = false;
+    bool any_scenario_flag_ = false;
+
+    bool simple_lane_change_start_    = false;
+    bool simple_lane_change_end_      = false;
+    int  simple_lane_change_start_wp_  = -1;     // 시작 웨이포인트 인덱스
+    int  simple_lane_change_duration_wp_ = 200;
+    int32_t simple_lane_change_start_frame_ = -1;
+    int32_t simple_lane_change_delay_frames_ = 75; 
 
     // *changed
     double truck0_velocity_;
@@ -155,11 +159,19 @@ private:
     // *changed
     bool truck0_overspeed_flag_;
     bool truck1_overspeed_flag_;
-    bool truck2_overspeed_flag_;
+    bool truck2_overspeed_flag_;    
 
     mutable std::mutex ready_mtx_;
-    InputsReady ready_;
+    ReadyState ready_;
     
+    // *changed
+    int LV_aid = 0;
+    int FV1_aid = 1;
+    int FV2_aid = 2;
+
+    double acc_speed_;
+    double slow_speed_;
+    double stable_speed_;
 
     // 웨이포인트 관련
     std::vector<Waypoint> _waypoints_0;
@@ -183,6 +195,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::Int32>::SharedPtr pub_formation_change_flag_;
 
     // Subscribers
+    rclcpp::Subscription<std_msgs::msg::UInt32>::SharedPtr sub_frame_;
     rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_formation_end_change_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_server_enu_;
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck0_pos_;
@@ -190,63 +203,76 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Point>::SharedPtr sub_truck2_pos_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_current_velocity_;
     rclcpp::Subscription<ros2_msg::msg::TruckCommand>::SharedPtr sub_formation_command_;
-    rclcpp::Subscription<std_msgs::msg::UInt32>::SharedPtr sub_frame_;
-
-
 
     // *changed
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_truck0_velocity_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_truck1_velocity_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr sub_truck2_velocity_;
+    
+    //set-scenario
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_emergency_stop_scenario_flag_; 
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_cut_in_scenario_flag_;
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_traffic_jam_scenario_flag_; 
+    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr sub_simple_lane_change_flag_;
 
     // 타이머 (주기적 제어용)
     rclcpp::TimerBase::SharedPtr timer_;
+    std::ofstream log_file_;
 
     // Callback 함수들
-    void formation_change_end_callback(const std_msgs::msg::Bool::SharedPtr msg);
+    void on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg);
+
     void server_enu_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck0_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck1_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
     void truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg);
-    void formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg);
-    bool all_inputs_ready() const; 
-
+    
     void current_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
     void truck0_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
     void truck1_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
     void truck2_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg);
-    bool check_stable_speeds();
-    bool check_overspeed();
 
-    void on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg);
+    // formation-scenario
+    void formation_command_callback(const ros2_msg::msg::TruckCommand::SharedPtr msg);
+    void formation_change_end_callback(const std_msgs::msg::Bool::SharedPtr msg);
 
+    // set-scenario
+    void emergency_stop_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg);
+    void cut_in_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg);
+    void traffic_jam_scenario_flag_callback(const std_msgs::msg::Bool::SharedPtr msg);
+    void simple_lane_change_flag_callback(const std_msgs::msg::Bool::SharedPtr msg);
+
+    void mission_taken_on_EMERGENCY_STOP();
+    void mission_taken_on_TRAFFIC_JAM();
+    void mission_taken_on_CUT_IN();
+    void mission_taken_on_SIMPLE_LANE_CHANGE();
+    
     // Formation 관련 함수들
     int calculate_leader_truck_number();
 
     // 속도 제어 관련 함수들
     double get_reference_velocity(int fid, double distance_to_leader);
     double adjust_velocity_for_steering(double base_velocity, double steering);
-    double calculate_pid_output(double current_vel, double target_vel, 
-                              double kp, double ki, double kd);
+    double calculate_pid_output(double current_vel, double target_vel, double kp, double ki, double kd);
     double normalize_control_output(double pid_output);
-    double calculate_platoon_velocity(int current_fid, 
-                                    double distance_to_leader,
-                                    double current_velocity,
-                                    double current_steering);
+    double calculate_platoon_velocity(int current_fid,  double distance_to_leader, double current_velocity, double current_steering);
     double get_distance_to_leader();
 
     // 유틸리티 함수들
+    bool check_stable_speeds();
+    bool check_overspeed();
+    bool all_inputs_ready() const; 
+
     void compute_control();
     void load_waypoints_0(const std::string &csv_path);
     void load_waypoints_1(const std::string &csv_path);
     double distSq(Point2D p1, Point2D p2);
-    //double calculate_target_velocity(double steer_angle);
     void publish_odom(double cur_x_, double cur_y_, double cur_z_, double yaw);
     void check_mission_state_(int cur_idx_);    
 
     void check_overrun();
     void check_lane_change_end();
     void update_formation_id();
+    bool check_stable_gaps();
     
-
 };

@@ -30,9 +30,7 @@ def generate_controllers(context):
               'WHEEL_BASE':      16.0,
               'DESIRED_GAP':      16.8,
               'MIN_GAP':          14.0,
-              'EMERGENCY_GAP':      5.0,
-
- 
+              'EMERGENCY_GAP':      5.0, 
             }]
         ))
 
