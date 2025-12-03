@@ -8,7 +8,7 @@ static auto &RandomChoice(const RangeT &range, RNG &&generator) {
   return range[dist(std::forward<RNG>(generator))];
 }
 
-SyncManager::SyncManager(): Node("sync_manager_node"), registration_(10,false), sync_throttle(10,false), sync_steer(10,false) 
+SyncManager::SyncManager(): Node("sync_manager_node"), registration_(10,false), sync_throttle(10,false), sync_steer(10,false) , sync_soc(10,false) 
 {
 
 	//------------Connect CARLA------------
@@ -36,6 +36,8 @@ SyncManager::SyncManager(): Node("sync_manager_node"), registration_(10,false), 
     RegistrationSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/registration", 10, std::bind(&SyncManager::RegistrationSubCallback, this, std::placeholders::_1));
     SyncThrottleSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/sync_throttle", 10, std::bind(&SyncManager::SyncThrottleSubCallback, this, std::placeholders::_1));
     SyncSteerSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/sync_steer", 10, std::bind(&SyncManager::SyncSteerSubCallback, this, std::placeholders::_1));
+    SyncSOCSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/sync_soc", 10, std::bind(&SyncManager::SyncSOCSubCallback, this, std::placeholders::_1));
+    // SyncDragSubscriber_ = this->create_subscription<std_msgs::msg::Int32>("/sync_drag", 10, std::bind(&SyncManager::SyncDragSubCallback, this, std::placeholders::_1));
     SyncEnuSubscriber_ = this->create_subscription<geometry_msgs::msg::Point>("truck0/server/enu", 10, [&](const geometry_msgs::msg::Point::SharedPtr msg){
         enu = true;
     });
@@ -179,6 +181,13 @@ void SyncManager::SyncSteerSubCallback(const std_msgs::msg::Int32::SharedPtr msg
     sync_steer[msg->data] = true;
 }
 
+void SyncManager::SyncSOCSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
+    unique_lock<mutex> lock(mutex_);
+    sync_soc[msg->data] = true;
+}
+
+
+
 bool SyncManager::check_register() 
 {
     if(size == 0) return false;
@@ -220,6 +229,7 @@ bool SyncManager::check_register()
 
         return true;
     }
+    return false;
 }
 
 void SyncManager::FindAllTruck() 
@@ -271,6 +281,15 @@ bool SyncManager::sync_received()
         }
     }
 
+    //sync_steer 배열의 모든 원소가 true인지 확인
+    for (int i = 0; i < size; i++) 
+    {
+        if (sync_soc[i] == false) 
+        {
+            return false; // 하나라도 false면 false 반환
+        }
+    }
+
     //all received
     for(int i = 0; i<size; i++) 
     {
@@ -280,7 +299,12 @@ bool SyncManager::sync_received()
     {
         sync_steer[i] = false;
     }
+    for(int i = 0; i<size; i++) 
+    {
+        sync_soc[i] = false;
+    }
     
+    RCLCPP_INFO(this->get_logger(), "All received");
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     return true;
 
@@ -376,14 +400,19 @@ void SyncManager::tickSchedulerThread()
             t0_init = true;
         }
 
+
         // frame publish
         const uint32_t k = frame_k.fetch_add(1) + 1;
         std_msgs::msg::UInt32 msg;
         msg.data = k;
         FramePub_->publish(msg);
+        RCLCPP_INFO(this->get_logger(), "Tick for frame %u", k);
 
+        RCLCPP_INFO(this->get_logger(), "Before Tick");
         // 실제 CARLA step
         world->Tick(time_);
+        RCLCPP_INFO(this->get_logger(), "After Tick");
+
 
         // 다음 recordTiming을 위해 저장
         prev_frame       = k;

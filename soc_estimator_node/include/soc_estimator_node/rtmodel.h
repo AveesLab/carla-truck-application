@@ -7,9 +7,9 @@
 //
 // Code generated for Simulink model 'BMS'.
 //
-// Model version                  : 10.118
+// Model version                  : 10.119
 // Simulink Coder version         : 24.2 (R2024b) 21-Jun-2024
-// C/C++ source code generated on : Thu Nov  6 15:11:50 2025
+// C/C++ source code generated on : Mon Dec  1 19:48:07 2025
 //
 // Target selection: ert.tlc
 // Embedded hardware selection: Intel->x86-64 (Linux 64)

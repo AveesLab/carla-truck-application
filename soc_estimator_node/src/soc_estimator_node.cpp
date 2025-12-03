@@ -27,42 +27,46 @@ SOCEstimatorNode::SOCEstimatorNode()
             {
                 current_speed_ = msg->data;
 
-                {
-                    std::lock_guard<std::mutex> lock(ready_mtx_);
-                    ready_.ego_vel = ready_.frame_id;
-                }
-                if (all_inputs_ready()) { compute_SOC(); }
+                // {
+                //     std::lock_guard<std::mutex> lock(ready_mtx_);
+                //     ready_.ego_vel = ready_.frame_id;
+                //     RCLCPP_INFO(this->get_logger(), "ego_vel for frame %d", ready_.frame_id);
+                // }
+                //if (all_inputs_ready()) { compute_SOC(); }
             });
 
     //subscribe velocity control
     reference_vel_sub_ = create_subscription<std_msgs::msg::Float64>("/" + truck_id_ + "/reference_velocity", 10, [this](const std_msgs::msg::Float64::SharedPtr msg)
             {
                 reference_velocity_ = msg->data;
-                {
-                    std::lock_guard<std::mutex> lock(ready_mtx_);
-                    ready_.refer_vel = ready_.frame_id;
-                }
-                if (all_inputs_ready()) { compute_SOC(); }
+                // {
+                //     std::lock_guard<std::mutex> lock(ready_mtx_);
+                //     ready_.refer_vel = ready_.frame_id;
+                //     RCLCPP_INFO(this->get_logger(), "refer_vel for frame %d", ready_.frame_id);
+                // }
+                //if (all_inputs_ready()) { compute_SOC(); }
             });
 
     pos_sub_ = create_subscription<nav_msgs::msg::Odometry>("/truck" + std::to_string(id) + "/ENU", 10, [this](const nav_msgs::msg::Odometry::SharedPtr msg) 
             {   
                 ego_pos = msg->pose.pose.position;
-                {
-                    std::lock_guard<std::mutex> lock(ready_mtx_);
-                    ready_.ego_enu = ready_.frame_id;
-                }
-                if (all_inputs_ready()) { compute_SOC(); } 
+                // {
+                //     std::lock_guard<std::mutex> lock(ready_mtx_);
+                //     ready_.ego_enu = ready_.frame_id;
+                //     RCLCPP_INFO(this->get_logger(), "ego_enu for frame %d", ready_.frame_id);
+                // }
+                //if (all_inputs_ready()) { compute_SOC(); } 
             });
 
     target_pos_sub_ = create_subscription<nav_msgs::msg::Odometry>("/truck" + std::to_string(pred_id_) + "/ENU", 10, [this](const nav_msgs::msg::Odometry::SharedPtr msg) 
             {   
                 target_pos = msg->pose.pose.position;
-                {
-                    std::lock_guard<std::mutex> lock(ready_mtx_);
-                    ready_.target_enu = ready_.frame_id;
-                }
-                if (all_inputs_ready()) { compute_SOC(); } 
+                // {
+                //     std::lock_guard<std::mutex> lock(ready_mtx_);
+                //     ready_.target_enu = ready_.frame_id;
+                //     RCLCPP_INFO(this->get_logger(), "target_enu for frame %d", ready_.frame_id);
+                // }
+                //if (all_inputs_ready()) { compute_SOC(); } 
             });
 
     // subscribe frame tick
@@ -87,11 +91,17 @@ SOCEstimatorNode::SOCEstimatorNode()
     // Simulink 모델 초기화
     BMSObj.initialize();
 
-    RCLCPP_INFO(get_logger(), "Initialized soc_estimator for %s (mode=%s)", truck_id_.c_str(), mode_.c_str());
+    // CSV 파일 열기
+    const std::string path = std::string("/home/avees/ros2_ws/src/test_soc/soc_estimator_") + truck_id_ + ".csv";
+    csv_file_.open(path, std::ios::out | std::ios::trunc); 
+    if (!csv_file_.is_open()) {
+        RCLCPP_ERROR(get_logger(), "Failed to open CSV file: %s", path.c_str());
+    } else {
+        csv_file_ << "truck_id,frame,sim_time_s,mode,soc_pct,distance_m,velocity_kph,aero_drag\n";
+        csv_file_.flush();
+    }
 
-    std::string path = std::string("/home/avees/ros2_ws/src/test_soc/soc_estimator_") + truck_id_ + ".csv";
-    csv_file_.open(path);
-    csv_file_ << "truck_id,frame,simulation_time,mode,SOC(%),distance(m),velocity(km/h)\n";
+    RCLCPP_INFO(get_logger(), "Initialized soc_estimator for %s (mode=%s)", truck_id_.c_str(), mode_.c_str());
 
 }
 
@@ -103,7 +113,8 @@ void SOCEstimatorNode::on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg)
     // 1) 이번 프레임으로 업데이트
     uint32_t prev_frame = ready_.frame_id;
     ready_.frame_id = frame_id;
-    ready_.computed = false;
+    //ready_.computed = false;
+    compute_SOC(); 
 }
 
 bool SOCEstimatorNode::all_inputs_ready() const
@@ -186,10 +197,10 @@ double SOCEstimatorNode::compute_distance(const geometry_msgs::msg::Point &a, co
 
 void SOCEstimatorNode::compute_SOC()
 {
-    {
-        std::lock_guard<std::mutex> lock(ready_mtx_);
-        ready_.computed = true;  
-    }
+    // {
+    //     std::lock_guard<std::mutex> lock(ready_mtx_);
+    //     ready_.computed = true;  
+    // }
     //RCLCPP_INFO(this->get_logger(), "Start computing SOC estimation for frame %d", ready_.frame_id);
 
     if (measuring_baseline_)
@@ -219,20 +230,8 @@ void SOCEstimatorNode::compute_SOC()
         BMSObj.rtU.target_velocity = current_speed_ * 3.6; //kph
         BMSObj.rtU.ego_velocity = output_speed_; // mps
         BMSObj.rtU.Mass_kg = 40000.0;
-        if(mode_changed_ && mode_ == "FV2")
-        { 
-            BMSObj.rtU.Mode = 2.0;
-        }
-        else{
-            BMSObj.rtU.Mode = (mode_ == "LV") ? 0.0 : 1.0;
-        }
-        
-        if(mode_ != "LV") {
-            BMSObj.rtU.IVD = compute_distance(ego_pos, target_pos);
-        }
-        else {
-            BMSObj.rtU.IVD = 30.0;
-        }
+        BMSObj.rtU.Mode = (mode_changed_ && mode_ == "FV2") ? 2.0 : ((mode_ == "LV") ? 0.0 : 1.0);
+        BMSObj.rtU.IVD  = (mode_ != "LV") ? compute_distance(ego_pos, target_pos) : 30.0;
         
         // 2) 모델 한 스텝 실행
         BMSObj.step();
@@ -240,14 +239,11 @@ void SOCEstimatorNode::compute_SOC()
         // 3) 출력 읽기 및 상태 업데이트
         output_distance_ = BMSObj.rtY.Positionm;
         output_speed_    = BMSObj.rtY.Speedms;
-        output_soc_= BMSObj.rtY.SOC;
+        output_soc_= BMSObj.rtY.Battery_SOC;
         output_aerodrag_ = BMSObj.rtY.Aero;
         
-        if (has_prev_pos_) 
-        {
-            double delta_dist = compute_distance(ego_pos, last_pos_);
-            total_distance_m_ += delta_dist;
-        }
+        if (has_prev_pos_) total_distance_m_ += compute_distance(ego_pos, last_pos_);
+
         last_pos_ = ego_pos;
         has_prev_pos_ = true;
 
@@ -260,47 +256,34 @@ void SOCEstimatorNode::compute_SOC()
         status_msg.mode     = mode_;
         status_pub_->publish(status_msg);
 
-        std_msgs::msg::Float32 aero_drag_;
+        
 
-        if ( i == 3 ) 
+        if ( i == num_steps -1 ) 
         {
-            if(mode_changed_) {  
-                aero_drag_.data = 0.6441;
-            } else { 
-                aero_drag_.data = output_aerodrag_; 
-            }
-
-            aero_pub_->publish(aero_drag_);
+            std_msgs::msg::Float32 drag_msg;
+            drag_msg.data = mode_changed_ ? 0.6441f : static_cast<float>(output_aerodrag_);
+            aero_pub_->publish(drag_msg);
+            
             std_msgs::msg::Int32 index;
             index.data = std::stoi(truck_id_.substr(5));
             sync_soc_pub_->publish(index);
 
-            rclcpp::Time wall_time = rclcpp::Clock(RCL_SYSTEM_TIME).now();  // 실시간 기준 시간
-            csv_file_ << truck_id_ << ","
-                << ready_.frame_id << ","
-                << ready_.frame_id * 0.04 << ","
-                << mode_ << ","
-                << output_soc_ << ","
-                << total_distance_m_ << ","
-                << current_speed_ * 3.6 << "\n";
-
-            csv_file_.flush();
+            if (csv_file_.is_open()) 
+            {
+                csv_file_ << truck_id_ << ","
+                        << ready_.frame_id << ","
+                        << std::fixed << std::setprecision(2) << (ready_.frame_id * 0.04) << ","  // 필요시 0.04를 파라미터화
+                        << mode_ << ","
+                        << std::setprecision(4) << output_soc_ << ","
+                        << std::setprecision(3) << total_distance_m_ << ","
+                        << std::setprecision(3) << (current_speed_ * 3.6) << ","
+                        << std::setprecision(4) << output_aerodrag_
+                        << "\n";
+                csv_file_.flush();  // 매 프레임 즉시 디스크 반영
+            }
             
             //RCLCPP_INFO(get_logger(),"[Frame: %.d][%s:%s] SOC: %.2f%%  POS: %.2fm  VEL: %.2fkm/h  TARGET_VEL: %.2fkm/h  Aero: %.2f ",ready_.frame_id,truck_id_.c_str(), mode_.c_str(),output_soc_, total_distance_m_, output_speed_ * 3.6, current_speed_ * 3.6, aero_drag_.data);
         }
-        
-        // rclcpp::Time wall_time = rclcpp::Clock(RCL_SYSTEM_TIME).now();  // 실시간 기준 시간
-        // csv_file_ << truck_id_ << ","
-        //     << ready_.frame_id << ","
-        //     << ready_.frame_id * 0.04 << ","
-        //     << mode_ << ","
-        //     << output_soc_ << ","
-        //     << total_distance_m_ << ","
-        //     << current_speed_ * 3.6 << "\n";
-
-        // csv_file_.flush();
-        
-        // RCLCPP_INFO(get_logger(),"[Frame: %.d][%s:%s] SOC: %.2f%%  POS: %.2fm  VEL: %.2fkm/h Aero: %.2f ",ready_.frame_id,truck_id_.c_str(), mode_.c_str(),output_soc_, total_distance_m_, current_speed_ * 3.6, aero_drag_.data);
     }
 
 }
