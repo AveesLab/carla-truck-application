@@ -171,9 +171,21 @@ void SyncManager::FV2SteerSubCallback(const std_msgs::msg::Float32::SharedPtr ms
 }
 
 
-void SyncManager::SyncThrottleSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
-    unique_lock<mutex> lock(mutex_);
+void SyncManager::SyncThrottleSubCallback(const std_msgs::msg::Int32::SharedPtr msg) 
+{
+    // unique_lock<mutex> lock(mutex_);
     sync_throttle[msg->data] = true;
+
+    // 1) frame_id 증가 & publish
+    std_msgs::msg::UInt32 frame_msg;
+    frame_msg.data = frame_k.fetch_add(1) + 1;
+    FramePub_->publish(frame_msg);
+
+    // 2) CARLA Tick 바로 호출
+    world->Tick(time_);
+
+    RCLCPP_INFO(this->get_logger(), "[B-Mode] Tick for frame %u (truck %d sync_throttle)", frame_msg.data, msg->data);
+
 }
 
 void SyncManager::SyncSteerSubCallback(const std_msgs::msg::Int32::SharedPtr msg) {
@@ -325,32 +337,32 @@ void SyncManager::managerInThread()
                 RCLCPP_INFO(this->get_logger(), "Start");
             }
 
-            if (sync_received()) 
-            {
-                auto current_frame = frame_k.load(std::memory_order_acquire);
+            // if (sync_received()) 
+            // {
+            //     auto current_frame = frame_k.load(std::memory_order_acquire);
 
-                if (current_frame != last_frame) 
-                {
-                    // 지금 시각(ns)
-                    using clock = std::chrono::steady_clock;
-                    using ns    = std::chrono::nanoseconds;
-                    auto now_tp = std::chrono::time_point_cast<ns>(clock::now());
-                    int64_t now_ns = now_tp.time_since_epoch().count();
-                    last_sync_finish_ns_.store(now_ns, std::memory_order_release);
+            //     if (current_frame != last_frame) 
+            //     {
+            //         // 지금 시각(ns)
+            //         using clock = std::chrono::steady_clock;
+            //         using ns    = std::chrono::nanoseconds;
+            //         auto now_tp = std::chrono::time_point_cast<ns>(clock::now());
+            //         int64_t now_ns = now_tp.time_since_epoch().count();
+            //         last_sync_finish_ns_.store(now_ns, std::memory_order_release);
 
-                    // tick 시작 시각 읽기
-                    int64_t tick_ns = last_tick_start_ns_.load(std::memory_order_acquire);
-                    if (tick_ns != 0) 
-                    {
-                        double latency_ms = double(now_ns - tick_ns) / 1e6;  // ms로 변환
-                        RCLCPP_INFO(this->get_logger(), "[SYNC : Frame %d] control path latency = %.3f ms", current_frame, latency_ms);
-                    }
+            //         // tick 시작 시각 읽기
+            //         int64_t tick_ns = last_tick_start_ns_.load(std::memory_order_acquire);
+            //         if (tick_ns != 0) 
+            //         {
+            //             double latency_ms = double(now_ns - tick_ns) / 1e6;  // ms로 변환
+            //             RCLCPP_INFO(this->get_logger(), "[SYNC : Frame %d] control path latency = %.3f ms", current_frame, latency_ms);
+            //         }
                     
-                    go_time = true;
-                    tick_request_ = true; // ✅ 별도 tick thread에서 처리할 flag
-                    last_frame = current_frame;
-                }
-            }
+            //         go_time = true;
+            //         tick_request_ = true; // ✅ 별도 tick thread에서 처리할 flag
+            //         last_frame = current_frame;
+            //     }
+            // }
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1)); // 최소 부하
     }

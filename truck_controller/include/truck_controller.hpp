@@ -149,7 +149,7 @@ private:
     int  simple_lane_change_start_wp_  = -1;     // 시작 웨이포인트 인덱스
     int  simple_lane_change_duration_wp_ = 200;
     int32_t simple_lane_change_start_frame_ = -1;
-    int32_t simple_lane_change_delay_frames_ = 75; 
+    int32_t simple_lane_change_delay_frames_ = 50; 
 
     // *changed
     double truck0_velocity_;

@@ -164,11 +164,12 @@ TruckController::TruckController(int argu_id)
 void TruckController::on_frame_tick(const std_msgs::msg::UInt32::SharedPtr msg)
 {
     const uint32_t frame_id = msg->data;
-    std::lock_guard<std::mutex> lock(ready_mtx_);
-
-    uint32_t prev_frame = ready_.frame_id;
-    ready_.frame_id = frame_id;
-    ready_.computed = false;
+    {
+        std::lock_guard<std::mutex> lock(ready_mtx_);
+        ready_.frame_id = frame_id;
+        ready_.computed = false;   // 이건 안 써도 되지만, 쓰면 나쁠 건 없음
+    }
+    compute_control();
 }
 
 bool TruckController::all_inputs_ready() const
@@ -398,10 +399,10 @@ void TruckController::compute_control()
             std_msgs::msg::Float64 vel_msg; 
             vel_msg.data = 0.0; 
             pub_vel_->publish(vel_msg);
-            {
-                std::lock_guard<std::mutex> lock(ready_mtx_);
-                ready_.computed = true;
-            }
+            // {
+            //     std::lock_guard<std::mutex> lock(ready_mtx_);
+            //     ready_.computed = true;
+            // }
             return;
         }
 
@@ -429,10 +430,10 @@ void TruckController::compute_control()
             vel_msg.data = 1.0;  // 초기 throttle 값 (0.3 = 30% 가속)
             pub_vel_->publish(vel_msg);
 
-            {
-                std::lock_guard<std::mutex> lock(ready_mtx_);
-                ready_.computed = true;
-            }
+            // {
+            //     std::lock_guard<std::mutex> lock(ready_mtx_);
+            //     ready_.computed = true;
+            // }
 
             // Odometry 발행 (생성자에서 설정된 초기 가이드 Yaw 사용)
             if (!std::isnan(current_yaw_))
@@ -610,7 +611,7 @@ void TruckController::compute_control()
             // if(current_wp_idx_ > 6200 && current_wp_idx_<6300) lane_change_flag_=true;
             //if(current_wp_idx_ > 7700 && current_wp_idx_<7800) simple_lane_change_flag_=true;
             //if(current_wp_idx_ > 9200 && current_wp_idx_<9300) lane_change_flag_=true;
-            if(current_wp_idx_ > 10700 && current_wp_idx_<10800) simple_lane_change_flag_=true;
+            if(current_wp_idx_ > 10700 && current_wp_idx_<10800) lane_change_flag_=true;
             // if(current_wp_idx_ > 12200 && current_wp_idx_<12300) lane_change_flag_=true;
             //if(current_wp_idx_ > 13700 && current_wp_idx_<13800) lane_change_flag_=true;
             // if(current_wp_idx_ > 15200 && current_wp_idx_<15300) lane_change_flag_=true;
@@ -1088,13 +1089,13 @@ void TruckController::truck0_pos_callback(const geometry_msgs::msg::Point::Share
     truck_positions_[0].x = msg->x;
     truck_positions_[0].y = msg->y;
     truck_positions_[0].z = msg->z;
-    {
-        std::lock_guard<std::mutex> lock(ready_mtx_);
-        ready_.enu[0] = ready_.frame_id;
-    }
-    if (all_inputs_ready()) {
-        compute_control();
-    }
+    // {
+    //     std::lock_guard<std::mutex> lock(ready_mtx_);
+    //     ready_.enu[0] = ready_.frame_id;
+    // }
+    // if (all_inputs_ready()) {
+    //     compute_control();
+    // }
 
 }
 
@@ -1118,13 +1119,13 @@ void TruckController::truck1_pos_callback(const geometry_msgs::msg::Point::Share
     truck_positions_[1].x = msg->x;
     truck_positions_[1].y = msg->y;
     truck_positions_[1].z = msg->z;
-    {
-        std::lock_guard<std::mutex> lock(ready_mtx_);
-        ready_.enu[1] = ready_.frame_id;
-    }
-    if (all_inputs_ready()) {
-        compute_control();
-    }
+    // {
+    //     std::lock_guard<std::mutex> lock(ready_mtx_);
+    //     ready_.enu[1] = ready_.frame_id;
+    // }
+    // if (all_inputs_ready()) {
+    //     compute_control();
+    // }
 }
 
 void TruckController::truck2_pos_callback(const geometry_msgs::msg::Point::SharedPtr msg) 
@@ -1147,14 +1148,15 @@ void TruckController::truck2_pos_callback(const geometry_msgs::msg::Point::Share
     truck_positions_[2].x = msg->x;
     truck_positions_[2].y = msg->y;
     truck_positions_[2].z = msg->z;
-    {
-        std::lock_guard<std::mutex> lock(ready_mtx_);
-        ready_.enu[2] = ready_.frame_id;
-    }
-        if (all_inputs_ready()) {
-        compute_control();
-    }
+    // {
+    //     std::lock_guard<std::mutex> lock(ready_mtx_);
+    //     ready_.enu[2] = ready_.frame_id;
+    // }
+    //     if (all_inputs_ready()) {
+    //     compute_control();
+    // }
 }
+
 // 현재 포메이션 기준 선행 차량과의 거리 계산
 double TruckController::get_distance_to_leader() 
 {
@@ -1202,14 +1204,14 @@ void TruckController::truck0_velocity_callback(const std_msgs::msg::Float32::Sha
     truck0_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
     if(truck0_velocity_ > 95) truck0_overspeed_flag_ = true;
 
-    {
-        std::lock_guard<std::mutex> lock(ready_mtx_);
-        ready_.vel[0] = ready_.frame_id;
-    }
+    // {
+    //     std::lock_guard<std::mutex> lock(ready_mtx_);
+    //     ready_.vel[0] = ready_.frame_id;
+    // }
 
-    if (all_inputs_ready()) {
-        compute_control();
-    }
+    // if (all_inputs_ready()) {
+    //     compute_control();
+    // }
 }
 
 
@@ -1217,28 +1219,28 @@ void TruckController::truck1_velocity_callback(const std_msgs::msg::Float32::Sha
 {   
     truck1_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
     if(truck1_velocity_ > 95) truck1_overspeed_flag_ = true;
-    {
-        std::lock_guard<std::mutex> lock(ready_mtx_);
-        ready_.vel[1] = ready_.frame_id;
-    }
+    // {
+    //     std::lock_guard<std::mutex> lock(ready_mtx_);
+    //     ready_.vel[1] = ready_.frame_id;
+    // }
 
-    if (all_inputs_ready()) {
-        compute_control();
-    }
+    // if (all_inputs_ready()) {
+    //     compute_control();
+    // }
 }
 
 void TruckController::truck2_velocity_callback(const std_msgs::msg::Float32::SharedPtr msg)
 {   
     truck2_velocity_ = msg->data * 3.6;  // m/s를 km/h로 변환
     if(truck2_velocity_ > 95) truck2_overspeed_flag_ = true;
-    {
-        std::lock_guard<std::mutex> lock(ready_mtx_);
-        ready_.vel[2] = ready_.frame_id;
-    }
+    // {
+    //     std::lock_guard<std::mutex> lock(ready_mtx_);
+    //     ready_.vel[2] = ready_.frame_id;
+    // }
 
-    if (all_inputs_ready()) {
-        compute_control();
-    }
+    // if (all_inputs_ready()) {
+    //     compute_control();
+    // }
 }
 
 bool TruckController::check_stable_speeds()
